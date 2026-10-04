@@ -383,23 +383,13 @@ export async function initRedirect(alias) {
         "Shortlink ini tidak tersedia atau mungkin sudah dihapus."
       );
 
-      setStatus(
-        "Periksa kembali alamat shortlink atau minta link baru.",
-        ""
-      );
-
       return;
     }
 
     if (error?.status === 410) {
       showError(
         "Link sudah expired",
-        "Shortlink ini sudah melewati masa berlaku."
-      );
-
-      setStatus(
-        "Silakan gunakan link yang masih aktif.",
-        ""
+        "Shortlink ini sudah tidak aktif karena masa berlakunya telah berakhir."
       );
 
       return;
