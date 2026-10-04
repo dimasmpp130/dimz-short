@@ -5,10 +5,10 @@ const memoryStore =
   (globalThis.__DIMZLINK_MEMORY__ = new Map());
 
 const REDIS_URL =
-  process.env.UPSTASH_REDIS_REST_URL;
+  process.env.DIMZLINK_KV_REST_API_URL;
 
 const REDIS_TOKEN =
-  process.env.UPSTASH_REDIS_REST_TOKEN;
+  process.env.DIMZLINK_KV_REST_API_TOKEN;
 
 const redisEnabled =
   Boolean(
