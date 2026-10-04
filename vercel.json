@@ -4,12 +4,25 @@
       "source": "/admins.html",
       "destination": "/admins",
       "permanent": true
+    },
+    {
+      "source": "/shortlink",
+      "destination": "/",
+      "permanent": false
     }
   ],
   "rewrites": [
     {
       "source": "/admins",
       "destination": "/admins.html"
+    },
+    {
+      "source": "/created=:id",
+      "destination": "/index.html?created=:id"
+    },
+    {
+      "source": "/verify/mode=:mode",
+      "destination": "/verify.html?mode=:mode"
     },
     {
       "source": "/:alias([A-Za-z0-9_-]{4,32})",
