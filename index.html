@@ -310,6 +310,56 @@
       transform:none;
     }
 
+    /* Responsive action buttons */
+    .actions{
+      align-items:stretch;
+    }
+
+    #saveBtn{
+      flex:0 1 220px;
+      min-width:190px;
+    }
+
+    #cancelEdit{
+      flex:0 1 150px;
+    }
+
+    /* On small screens the button becomes full-width and
+       the label can be shortened without changing desktop UI. */
+    @media (max-width:900px){
+      #saveBtn,
+      #cancelEdit{
+        flex:1 1 0;
+        min-width:0;
+      }
+    }
+
+    @media (max-width:480px){
+      .actions{
+        flex-direction:column;
+      }
+
+      #saveBtn,
+      #cancelEdit{
+        width:100%;
+        flex:1 1 auto;
+      }
+
+      #saveBtn{
+        min-height:48px;
+      }
+    }
+
+    @media (max-width:360px){
+      #saveBtn[data-label-mobile]:not([data-loading]) span{
+        display:none;
+      }
+
+      #saveBtn[data-label-mobile]:not([data-loading])::after{
+        content:attr(data-label-mobile);
+      }
+    }
+
     .manager-card{
       margin-top:18px;
       overflow:hidden;
