@@ -1,15 +1,15 @@
 {
   "redirects": [
     {
-      "source": "/index.html",
-      "destination": "/shortlink",
+      "source": "/admins.html",
+      "destination": "/admins",
       "permanent": true
     }
   ],
   "rewrites": [
     {
-      "source": "/shortlink",
-      "destination": "/index.html"
+      "source": "/admins",
+      "destination": "/admins.html"
     },
     {
       "source": "/:alias([A-Za-z0-9_-]{4,32})",
