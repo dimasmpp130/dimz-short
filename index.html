@@ -55,8 +55,9 @@
     }
 
     .container{
-      width:min(1120px,calc(100% - 28px));
-      margin:auto;
+      width:min(1180px,calc(100% - 32px));
+      margin-left:auto;
+      margin-right:auto;
     }
 
     .topbar{
@@ -150,7 +151,10 @@
     }
 
     .form-card{
+      width:100%;
       padding:22px;
+      margin-left:auto;
+      margin-right:auto;
     }
 
     .section-title{
@@ -310,58 +314,9 @@
       transform:none;
     }
 
-    /* Responsive action buttons */
-    .actions{
-      align-items:stretch;
-    }
-
-    #saveBtn{
-      flex:0 1 220px;
-      min-width:190px;
-    }
-
-    #cancelEdit{
-      flex:0 1 150px;
-    }
-
-    /* On small screens the button becomes full-width and
-       the label can be shortened without changing desktop UI. */
-    @media (max-width:900px){
-      #saveBtn,
-      #cancelEdit{
-        flex:1 1 0;
-        min-width:0;
-      }
-    }
-
-    @media (max-width:480px){
-      .actions{
-        flex-direction:column;
-      }
-
-      #saveBtn,
-      #cancelEdit{
-        width:100%;
-        flex:1 1 auto;
-      }
-
-      #saveBtn{
-        min-height:48px;
-      }
-    }
-
-    @media (max-width:360px){
-      #saveBtn[data-label-mobile]:not([data-loading]) span{
-        display:none;
-      }
-
-      #saveBtn[data-label-mobile]:not([data-loading])::after{
-        content:attr(data-label-mobile);
-      }
-    }
-
     .manager-card{
-      margin-top:18px;
+      width:100%;
+      margin:18px auto 0;
       overflow:hidden;
     }
 
@@ -513,9 +468,17 @@
       padding:20px 0 30px;
     }
 
+    .redirect-center > .container{
+      display:flex;
+      justify-content:center;
+      width:min(1180px,calc(100% - 32px));
+    }
+
     .redirect-card{
-      width:min(560px,100%);
-      padding:26px;
+      width:100%;
+      max-width:760px;
+      margin:0 auto;
+      padding:30px;
       text-align:center;
     }
 
@@ -697,6 +660,17 @@
       display:none!important;
     }
 
+    @media(min-width:1200px){
+      .form-card{
+        padding:28px 30px;
+      }
+
+      .redirect-card{
+        max-width:820px;
+        padding:34px;
+      }
+    }
+
     @media(max-width:700px){
       .grid{
         grid-template-columns:1fr;
@@ -721,8 +695,9 @@
     }
 
     @media(max-width:480px){
-      .container{
-        width:min(100% - 20px,1120px);
+      .container,
+      .redirect-center > .container{
+        width:calc(100% - 20px);
       }
 
       .form-card{
