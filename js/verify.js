@@ -1,7 +1,8 @@
 const API_URL = "/api/shortlink";
 const STORAGE_KEY = "dimzlink_pending_create_v1";
 const params = new URLSearchParams(location.search);
-const mode = params.get("mode") || "create";
+const verifyMatch = location.pathname.match(/^\/verify\/mode=(create)$/);
+const mode = verifyMatch?.[1] || params.get("mode") || "create";
 const title = document.querySelector("#verifyTitle");
 const message = document.querySelector("#verifyMessage");
 const wrap = document.querySelector("#recaptchaWrap");
@@ -48,7 +49,7 @@ async function createAfterVerification() {
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "Gagal membuat shortlink.");
     sessionStorage.removeItem(STORAGE_KEY);
-    location.replace(`/shortlink?created=${encodeURIComponent(data.link.alias)}`);
+    location.replace(`/created=${encodeURIComponent(data.link.alias)}`);
   } catch (error) {
     submitted = false; spinner.classList.remove("show");
     setStatus(error.message || "Gagal membuat shortlink.", "error");
