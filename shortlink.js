@@ -1,9 +1,9 @@
-import { getAliasFromLocation } from "./js/shortlink/utils.js";
-import { initManager } from "./js/shortlink/manager.js";
-import { initRedirect } from "./js/shortlink/redirect.js";
-import { initShare } from "./js/shortlink/share.js";
-import { initQR } from "./js/shortlink/qr.js";
-import { initAds } from "./js/shortlink/ads.js";
+import { getAliasFromLocation } from "./js/utils.js";
+import { initManager } from "./js/manager.js";
+import { initRedirect } from "./js/redirect.js";
+import { initShare } from "./js/share.js";
+import { initQR } from "./js/qr.js";
+import { initAds } from "./js/ads.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   initShare();
