@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f8fb">
+<meta name="description" content="Security verification">
+<title>Security Verification - DIMZ/SHORT</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>body{min-height:100vh}.verify-center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.verify-card{width:min(100%,430px);text-align:center}.verify-icon{width:58px;height:58px;margin:0 auto 18px;border-radius:18px;display:grid;place-items:center;background:var(--primary-soft,#eef2ff);color:var(--primary,#4f46e5);font-size:24px}.verify-title{margin:0 0 8px}.verify-message{margin:0;color:var(--muted);line-height:1.6}.turnstile-wrap{min-height:65px;margin:22px 0 12px;display:flex;justify-content:center}.verify-status{min-height:22px;font-size:13px;color:var(--muted)}.verify-status.error{color:var(--danger)}.verify-status.success{color:var(--success)}.verify-spinner{display:none;margin-top:18px}.verify-spinner.show{display:block}</style>
+</head>
+<body>
+<main class="verify-center">
+<section class="card verify-card">
+<div class="verify-icon">✓</div>
+<h1 class="verify-title" id="verifyTitle">Security Verification</h1>
+<p class="verify-message" id="verifyMessage">Verify that you are human to continue.</p>
+<div class="turnstile-wrap" id="turnstileWrap"></div>
+<div class="verify-spinner" id="verifySpinner">Memproses...</div>
+<div class="verify-status" id="verifyStatus"></div>
+</section>
+</main>
+<script type="module" src="/js/verify.js"></script>
+</body>
+</html>
