@@ -424,7 +424,7 @@ async function handleSubmit(event) {
           "dimzlink_pending_create_v1",
           JSON.stringify(payload)
         );
-        window.location.href = "/verify/mode=create";
+        window.location.href = "/verify.html?mode=create";
         return;
       }
 
@@ -620,8 +620,7 @@ function attachEvents() {
 export async function initManager() {
   attachEvents();
   await refreshLinks();
-  const createdMatch = location.pathname.match(/^\/created=([A-Za-z0-9_-]{4,32})$/);
-  const alias = createdMatch?.[1] || new URLSearchParams(location.search).get("created");
+  const alias = new URLSearchParams(location.search).get("created");
   if (alias) {
     window.history.replaceState({}, document.title, "/shortlink");
     openResultModal(getShortUrl(alias));
