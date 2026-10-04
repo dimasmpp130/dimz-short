@@ -153,22 +153,15 @@ function renderLinks() {
       .trim()
       .toLowerCase();
 
-  const filtered =
-    allLinks.filter((link) => {
+  const filtered = allLinks.filter((link) => {
+    if (!search) {
+      return true;
+    }
 
-      if (!search) {
-        return true;
-      }
-
-      return (
-        String(link.alias)
-          .toLowerCase()
-          .includes(search) ||
-        String(link.destination)
-          .toLowerCase()
-          .includes(search)
-      );
-    });
+    return String(link.alias || "")
+      .toLowerCase()
+      .includes(search);
+  });
 
   if (!filtered.length) {
 
