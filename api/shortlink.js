@@ -1,8 +1,12 @@
 import crypto from "crypto";
 
-const memoryStore =
-  globalThis.__DIMZLINK_MEMORY__ ||
-  (globalThis.__DIMZLINK_MEMORY__ = new Map());
+/*
+========================================================
+ DIMZLINK - SHORTLINK API
+ Persistent storage: Redis / Upstash
+ Tidak menggunakan localStorage / memory sebagai database.
+========================================================
+*/
 
 const REDIS_URL =
   process.env.DIMZLINK_KV_REST_API_URL;
@@ -15,6 +19,12 @@ const redisEnabled =
     REDIS_URL &&
     REDIS_TOKEN
   );
+
+/*
+========================================================
+ RESPONSE
+========================================================
+*/
 
 function json(res, status, data) {
 
@@ -34,6 +44,12 @@ function json(res, status, data) {
     JSON.stringify(data)
   );
 }
+
+/*
+========================================================
+ CRYPTO
+========================================================
+*/
 
 function sha256(value) {
 
@@ -55,17 +71,28 @@ function makePasswordHash(password) {
   return sha256(password);
 }
 
+/*
+========================================================
+ ACCESS TOKEN
+========================================================
+*/
+
 function makeAccessToken(
   alias,
   passwordHash
 ) {
 
   const expires =
-    Date.now() + 10 * 60 * 1000;
+    Date.now() +
+    10 * 60 * 1000;
+
+  const secret =
+    process.env.DIMZLINK_TOKEN_SECRET ||
+    "dimzlink-default-secret";
 
   const signature =
     sha256(
-      `${alias}.${passwordHash}.${expires}.${process.env.DIMZLINK_TOKEN_SECRET || "dimzlink-default-secret"}`
+      `${alias}.${passwordHash}.${expires}.${secret}`
     );
 
   return `${expires}.${signature}`;
@@ -98,19 +125,32 @@ function validateAccessToken(
     return false;
   }
 
+  const secret =
+    process.env.DIMZLINK_TOKEN_SECRET ||
+    "dimzlink-default-secret";
+
   const expected =
     sha256(
-      `${alias}.${passwordHash}.${expires}.${process.env.DIMZLINK_TOKEN_SECRET || "dimzlink-default-secret"}`
+      `${alias}.${passwordHash}.${expires}.${secret}`
     );
 
   return parts[1] === expected;
 }
 
+/*
+========================================================
+ VALIDATION
+========================================================
+*/
+
 function normalizeAlias(alias) {
 
   return String(alias || "")
     .trim()
-    .replace(/[^A-Za-z0-9_-]/g, "")
+    .replace(
+      /[^A-Za-z0-9_-]/g,
+      ""
+    )
     .slice(0, 32);
 }
 
@@ -165,8 +205,9 @@ function validateRules(rules) {
       );
     }
 
-    result[String(key).slice(0, 10)] =
-      value;
+    result[
+      String(key).slice(0, 10)
+    ] = value;
   }
 
   return result;
@@ -180,23 +221,52 @@ function isExpired(link) {
   );
 }
 
+/*
+========================================================
+ REDIS
+========================================================
+*/
+
 function getKey(alias) {
 
   return `dimzlink:${alias}`;
 }
+
+function getClicksKey(alias) {
+
+  return `dimzlink:clicks:${alias}`;
+}
+
+/*
+ Redis REST command.
+*/
 
 async function redisCommand(
   command,
   ...args
 ) {
 
+  if (!redisEnabled) {
+
+    throw new Error(
+      "Redis belum dikonfigurasi. Pastikan DIMZLINK_KV_REST_API_URL dan DIMZLINK_KV_REST_API_TOKEN sudah dipasang di Vercel."
+    );
+  }
+
+  const encodedArgs =
+    args.map(
+      (value) =>
+        encodeURIComponent(
+          String(value)
+        )
+    );
+
   const response =
     await fetch(
-      `${REDIS_URL}/${command}/${args.map(
-        encodeURIComponent
-      ).join("/")}`,
+      `${REDIS_URL}/${command}/${encodedArgs.join("/")}`,
       {
         method: "POST",
+
         headers: {
           Authorization:
             `Bearer ${REDIS_TOKEN}`
@@ -206,8 +276,12 @@ async function redisCommand(
 
   if (!response.ok) {
 
+    const text =
+      await response.text()
+        .catch(() => "");
+
     throw new Error(
-      `Redis error ${response.status}`
+      `Redis error ${response.status}${text ? `: ${text}` : ""}`
     );
   }
 
@@ -217,68 +291,203 @@ async function redisCommand(
   return data.result;
 }
 
-async function getLink(alias) {
+/*
+========================================================
+ GET CLICK COUNTER
+========================================================
+*/
 
-  if (redisEnabled) {
+async function getClickCount(
+  alias,
+  fallback = 0
+) {
 
-    const raw =
-      await redisCommand(
-        "GET",
-        getKey(alias)
+  const raw =
+    await redisCommand(
+      "GET",
+      getClicksKey(alias)
+    );
+
+  if (
+    raw === null ||
+    raw === undefined ||
+    raw === ""
+  ) {
+
+    /*
+     Legacy migration:
+     Kalau shortlink lama belum mempunyai
+     counter Redis terpisah, ambil clicks
+     yang tersimpan di object lalu masukkan
+     ke Redis.
+    */
+
+    const initial =
+      Math.max(
+        0,
+        Number(fallback || 0)
       );
-
-    return raw
-      ? JSON.parse(raw)
-      : null;
-  }
-
-  return memoryStore.get(alias) || null;
-}
-
-async function saveLink(link) {
-
-  if (redisEnabled) {
 
     await redisCommand(
       "SET",
-      getKey(link.alias),
-      JSON.stringify(link)
+      getClicksKey(alias),
+      initial
     );
 
-    return;
+    return initial;
   }
 
-  memoryStore.set(
-    link.alias,
-    link
-  );
+  const count =
+    Number(raw);
+
+  return Number.isFinite(count)
+    ? count
+    : 0;
 }
 
-async function deleteStoredLink(alias) {
+/*
+========================================================
+ INCREMENT CLICK
+========================================================
+*/
 
-  if (redisEnabled) {
+async function incrementClickCount(
+  alias
+) {
 
+  const result =
     await redisCommand(
-      "DEL",
+      "INCR",
+      getClicksKey(alias)
+    );
+
+  const count =
+    Number(result);
+
+  if (!Number.isFinite(count)) {
+
+    throw new Error(
+      "Gagal memperbarui jumlah klik."
+    );
+  }
+
+  return count;
+}
+
+/*
+========================================================
+ GET LINK
+========================================================
+*/
+
+async function getLink(alias) {
+
+  const raw =
+    await redisCommand(
+      "GET",
       getKey(alias)
     );
 
-    return;
+  if (!raw) {
+    return null;
   }
 
-  memoryStore.delete(alias);
+  let link;
+
+  try {
+
+    link =
+      JSON.parse(raw);
+
+  } catch {
+
+    throw new Error(
+      "Data shortlink rusak atau tidak valid."
+    );
+  }
+
+  /*
+  Selalu ambil jumlah klik dari Redis counter.
+  */
+
+  link.clicks =
+    await getClickCount(
+      alias,
+      link.clicks
+    );
+
+  return link;
 }
+
+/*
+========================================================
+ SAVE LINK
+========================================================
+*/
+
+async function saveLink(link) {
+
+  /*
+  Jangan menjadikan field clicks sebagai
+  sumber utama lagi.
+
+  Counter disimpan terpisah menggunakan INCR/GET
+  agar klik bersamaan tidak saling menimpa.
+  */
+
+  const data = {
+    ...link
+  };
+
+  delete data.clicks;
+
+  await redisCommand(
+    "SET",
+    getKey(link.alias),
+    JSON.stringify(data)
+  );
+
+  /*
+  Pastikan counter click sudah ada.
+  */
+
+  await getClickCount(
+    link.alias,
+    link.clicks || 0
+  );
+}
+
+/*
+========================================================
+ DELETE
+========================================================
+*/
+
+async function deleteStoredLink(
+  alias
+) {
+
+  await redisCommand(
+    "DEL",
+    getKey(alias)
+  );
+
+  await redisCommand(
+    "DEL",
+    getClicksKey(alias)
+  );
+}
+
+/*
+========================================================
+ LIST ALL LINKS
+========================================================
+*/
 
 async function listStoredLinks() {
 
-  if (!redisEnabled) {
-
-    return [
-      ...memoryStore.values()
-    ];
-  }
-
   let cursor = "0";
+
   const keys = [];
 
   do {
@@ -294,11 +503,30 @@ async function listStoredLinks() {
       );
 
     cursor =
-      String(result[0]);
+      String(
+        result?.[0] ?? "0"
+      );
 
-    keys.push(
-      ...(result[1] || [])
-    );
+    const found =
+      result?.[1] || [];
+
+    for (const key of found) {
+
+      /*
+      Jangan memasukkan key counter
+      sebagai shortlink.
+      */
+
+      if (
+        !String(key)
+          .startsWith(
+            "dimzlink:clicks:"
+          )
+      ) {
+
+        keys.push(key);
+      }
+    }
 
   } while (
     cursor !== "0"
@@ -314,21 +542,48 @@ async function listStoredLinks() {
         key
       );
 
-    if (raw) {
+    if (!raw) {
+      continue;
+    }
 
-      try {
-        links.push(
-          JSON.parse(raw)
+    try {
+
+      const link =
+        JSON.parse(raw);
+
+      const alias =
+        normalizeAlias(
+          link.alias
         );
-      } catch {
-        // Ignore corrupted item.
+
+      if (!alias) {
+        continue;
       }
 
+      link.clicks =
+        await getClickCount(
+          alias,
+          link.clicks
+        );
+
+      links.push(link);
+
+    } catch {
+
+      /*
+      Abaikan data yang rusak.
+      */
     }
   }
 
   return links;
 }
+
+/*
+========================================================
+ PUBLIC LINK
+========================================================
+*/
 
 function publicLink(
   link,
@@ -336,20 +591,39 @@ function publicLink(
 ) {
 
   const result = {
-    alias: link.alias,
-    destination: link.destination,
-    expiresAt: link.expiresAt || null,
-    createdAt: link.createdAt,
-    clicks: Number(link.clicks || 0),
-    lastClickAt: link.lastClickAt || null,
+
+    alias:
+      link.alias,
+
+    destination:
+      link.destination,
+
+    expiresAt:
+      link.expiresAt || null,
+
+    createdAt:
+      link.createdAt,
+
+    clicks:
+      Number(link.clicks || 0),
+
+    lastClickAt:
+      link.lastClickAt || null,
+
     passwordProtected:
-      Boolean(link.passwordHash),
+      Boolean(
+        link.passwordHash
+      ),
+
     mobileUrl:
       link.mobileUrl || null,
+
     desktopUrl:
       link.desktopUrl || null,
+
     countryRules:
       link.countryRules || {},
+
     languageRules:
       link.languageRules || {}
   };
@@ -357,7 +631,9 @@ function publicLink(
   if (owner) {
 
     result.recentClicks =
-      Array.isArray(link.clickLog)
+      Array.isArray(
+        link.clickLog
+      )
         ? link.clickLog.slice(-20)
         : [];
   }
@@ -365,54 +641,92 @@ function publicLink(
   return result;
 }
 
+/*
+========================================================
+ DEVICE
+========================================================
+*/
+
 function detectDevice(userAgent) {
 
   const ua =
-    String(userAgent || "")
-      .toLowerCase();
+    String(
+      userAgent || ""
+    ).toLowerCase();
 
   if (
     /tablet|ipad/.test(ua)
   ) {
+
     return "tablet";
   }
 
   if (
     /mobile|android|iphone|ipod/.test(ua)
   ) {
+
     return "mobile";
   }
 
   return "desktop";
 }
 
+/*
+========================================================
+ BROWSER
+========================================================
+*/
+
 function detectBrowser(userAgent) {
 
   const ua =
-    String(userAgent || "");
+    String(
+      userAgent || ""
+    );
 
-  if (/Edg\//i.test(ua)) {
+  if (
+    /Edg\//i.test(ua)
+  ) {
+
     return "Edge";
   }
 
-  if (/OPR\//i.test(ua)) {
+  if (
+    /OPR\//i.test(ua)
+  ) {
+
     return "Opera";
   }
 
-  if (/Chrome\//i.test(ua)) {
+  if (
+    /Chrome\//i.test(ua)
+  ) {
+
     return "Chrome";
   }
 
-  if (/Firefox\//i.test(ua)) {
+  if (
+    /Firefox\//i.test(ua)
+  ) {
+
     return "Firefox";
   }
 
-  if (/Safari\//i.test(ua)) {
+  if (
+    /Safari\//i.test(ua)
+  ) {
+
     return "Safari";
   }
 
   return "Other";
 }
+
+/*
+========================================================
+ DESTINATION
+========================================================
+*/
 
 function selectDestination(
   link,
@@ -424,14 +738,16 @@ function selectDestination(
 
   const country =
     String(
-      headers["x-vercel-ip-country"] ||
-      ""
+      headers[
+        "x-vercel-ip-country"
+      ] || ""
     ).toUpperCase();
 
   const languageHeader =
     String(
-      headers["accept-language"] ||
-      ""
+      headers[
+        "accept-language"
+      ] || ""
     ).toLowerCase();
 
   const languages =
@@ -439,21 +755,27 @@ function selectDestination(
       .split(",")
       .map(
         (item) =>
-          item.trim()
+          item
+            .trim()
             .split(";")[0]
       )
       .filter(Boolean);
 
   const device =
     detectDevice(
-      headers["user-agent"]
+      headers[
+        "user-agent"
+      ]
     );
 
   if (
     country &&
     link.countryRules?.[country]
   ) {
-    return link.countryRules[country];
+
+    return (
+      link.countryRules[country]
+    );
   }
 
   for (
@@ -467,13 +789,23 @@ function selectDestination(
     if (
       link.languageRules?.[language]
     ) {
-      return link.languageRules[language];
+
+      return (
+        link.languageRules[language]
+      );
     }
 
     if (
-      link.languageRules?.[shortLanguage]
+      link.languageRules?.[
+        shortLanguage
+      ]
     ) {
-      return link.languageRules[shortLanguage];
+
+      return (
+        link.languageRules[
+          shortLanguage
+        ]
+      );
     }
   }
 
@@ -481,6 +813,7 @@ function selectDestination(
     device === "mobile" &&
     link.mobileUrl
   ) {
+
     return link.mobileUrl;
   }
 
@@ -488,16 +821,25 @@ function selectDestination(
     device === "desktop" &&
     link.desktopUrl
   ) {
+
     return link.desktopUrl;
   }
 
   return link.destination;
 }
 
+/*
+========================================================
+ IP
+========================================================
+*/
+
 function getClientIp(req) {
 
   const forwarded =
-    req.headers?.["x-forwarded-for"];
+    req.headers?.[
+      "x-forwarded-for"
+    ];
 
   if (forwarded) {
 
@@ -514,42 +856,60 @@ function getClientIp(req) {
   );
 }
 
+/*
+========================================================
+ CLICK DATA
+========================================================
+*/
+
 function buildClickData(req) {
 
   const userAgent =
     String(
-      req.headers?.["user-agent"] ||
-      ""
+      req.headers?.[
+        "user-agent"
+      ] || ""
     );
 
   const ip =
     getClientIp(req);
 
+  const ipSecret =
+    process.env.DIMZLINK_IP_SECRET ||
+    "dimzlink-ip-secret";
+
   return {
+
     time:
       new Date().toISOString(),
 
     ipHash:
       sha256(
-        `${ip}.${process.env.DIMZLINK_IP_SECRET || "dimzlink-ip-secret"}`
+        `${ip}.${ipSecret}`
       ),
 
     device:
-      detectDevice(userAgent),
+      detectDevice(
+        userAgent
+      ),
 
     browser:
-      detectBrowser(userAgent),
+      detectBrowser(
+        userAgent
+      ),
 
     country:
       String(
-        req.headers?.["x-vercel-ip-country"] ||
-        ""
+        req.headers?.[
+          "x-vercel-ip-country"
+        ] || ""
       ).toUpperCase() || null,
 
     language:
       String(
-        req.headers?.["accept-language"] ||
-        ""
+        req.headers?.[
+          "accept-language"
+        ] || ""
       ).slice(0, 100) || null,
 
     referrer:
@@ -563,12 +923,19 @@ function buildClickData(req) {
   };
 }
 
+/*
+========================================================
+ BODY
+========================================================
+*/
+
 async function parseBody(req) {
 
   if (
     req.body &&
     typeof req.body === "object"
   ) {
+
     return req.body;
   }
 
@@ -580,6 +947,7 @@ async function parseBody(req) {
       req.on(
         "data",
         (chunk) => {
+
           raw += chunk;
         }
       );
@@ -589,15 +957,19 @@ async function parseBody(req) {
         () => {
 
           if (!raw) {
+
             resolve({});
             return;
           }
 
           try {
+
             resolve(
               JSON.parse(raw)
             );
+
           } catch {
+
             reject(
               new Error(
                 "JSON body tidak valid."
@@ -615,9 +987,19 @@ async function parseBody(req) {
   );
 }
 
+/*
+========================================================
+ GENERATE ALIAS
+========================================================
+*/
+
 async function generateUniqueAlias() {
 
-  for (let i = 0; i < 15; i++) {
+  for (
+    let i = 0;
+    i < 15;
+    i++
+  ) {
 
     const alias =
       crypto
@@ -629,7 +1011,10 @@ async function generateUniqueAlias() {
         )
         .slice(0, 6);
 
-    if (!validAlias(alias)) {
+    if (
+      !validAlias(alias)
+    ) {
+
       continue;
     }
 
@@ -637,6 +1022,7 @@ async function generateUniqueAlias() {
       await getLink(alias);
 
     if (!exists) {
+
       return alias;
     }
   }
@@ -645,6 +1031,12 @@ async function generateUniqueAlias() {
     "Gagal membuat alias otomatis."
   );
 }
+
+/*
+========================================================
+ CREATE
+========================================================
+*/
 
 async function createLink(
   input
@@ -656,11 +1048,15 @@ async function createLink(
     );
 
   if (!alias) {
+
     alias =
       await generateUniqueAlias();
   }
 
-  if (!validAlias(alias)) {
+  if (
+    !validAlias(alias)
+  ) {
+
     throw new Error(
       "Alias tidak valid."
     );
@@ -682,8 +1078,11 @@ async function createLink(
   }
 
   if (
-    !validUrl(input.destination)
+    !validUrl(
+      input.destination
+    )
   ) {
+
     throw new Error(
       "Destination URL tidak valid."
     );
@@ -698,8 +1097,10 @@ async function createLink(
 
   if (
     expiresAt &&
-    Date.parse(expiresAt) <= Date.now()
+    Date.parse(expiresAt) <=
+      Date.now()
   ) {
+
     throw new Error(
       "Expiration harus berada di masa depan."
     );
@@ -707,8 +1108,11 @@ async function createLink(
 
   if (
     input.mobileUrl &&
-    !validUrl(input.mobileUrl)
+    !validUrl(
+      input.mobileUrl
+    )
   ) {
+
     throw new Error(
       "Mobile URL tidak valid."
     );
@@ -716,8 +1120,11 @@ async function createLink(
 
   if (
     input.desktopUrl &&
-    !validUrl(input.desktopUrl)
+    !validUrl(
+      input.desktopUrl
+    )
   ) {
+
     throw new Error(
       "Desktop URL tidak valid."
     );
@@ -747,10 +1154,13 @@ async function createLink(
 
     clicks: 0,
 
-    lastClickAt: null,
+    lastClickAt:
+      null,
 
     ownerKey:
-      String(input.ownerKey || ""),
+      String(
+        input.ownerKey || ""
+      ),
 
     passwordHash:
       input.password
@@ -782,6 +1192,12 @@ async function createLink(
 
   return link;
 }
+
+/*
+========================================================
+ UPDATE
+========================================================
+*/
 
 async function updateExistingLink(
   input
@@ -823,14 +1239,17 @@ async function updateExistingLink(
   }
 
   if (
-    !validUrl(input.destination)
+    !validUrl(
+      input.destination
+    )
   ) {
+
     throw new Error(
       "Destination URL tidak valid."
     );
   }
 
-  let expiresAt =
+  const expiresAt =
     input.expiresAt
       ? new Date(
           input.expiresAt
@@ -839,8 +1258,10 @@ async function updateExistingLink(
 
   if (
     expiresAt &&
-    Date.parse(expiresAt) <= Date.now()
+    Date.parse(expiresAt) <=
+      Date.now()
   ) {
+
     throw new Error(
       "Expiration harus berada di masa depan."
     );
@@ -848,8 +1269,11 @@ async function updateExistingLink(
 
   if (
     input.mobileUrl &&
-    !validUrl(input.mobileUrl)
+    !validUrl(
+      input.mobileUrl
+    )
   ) {
+
     throw new Error(
       "Mobile URL tidak valid."
     );
@@ -857,8 +1281,11 @@ async function updateExistingLink(
 
   if (
     input.desktopUrl &&
-    !validUrl(input.desktopUrl)
+    !validUrl(
+      input.desktopUrl
+    )
   ) {
+
     throw new Error(
       "Desktop URL tidak valid."
     );
@@ -894,7 +1321,9 @@ async function updateExistingLink(
 
   } else if (
     input.password &&
-    String(input.password).trim()
+    String(
+      input.password
+    ).trim()
   ) {
 
     link.passwordHash =
@@ -908,10 +1337,36 @@ async function updateExistingLink(
   return link;
 }
 
+/*
+========================================================
+ MAIN REQUEST
+========================================================
+*/
+
 async function handleRequest(
   req,
   res
 ) {
+
+  /*
+  Jangan pernah diam-diam menggunakan
+  memory sebagai database.
+  */
+
+  if (!redisEnabled) {
+
+    json(
+      res,
+      500,
+      {
+        ok: false,
+        error:
+          "DIMZLINK Redis belum dikonfigurasi. Tambahkan DIMZLINK_KV_REST_API_URL dan DIMZLINK_KV_REST_API_TOKEN di Vercel."
+      }
+    );
+
+    return;
+  }
 
   const method =
     String(
@@ -924,12 +1379,21 @@ async function handleRequest(
 
     res.statusCode = 204;
     res.end();
+
     return;
   }
 
   try {
 
-    if (method === "GET") {
+    /*
+    ====================================================
+    GET
+    ====================================================
+    */
+
+    if (
+      method === "GET"
+    ) {
 
       const query =
         req.query || {};
@@ -939,7 +1403,13 @@ async function handleRequest(
           query.action || ""
         );
 
-      if (action === "list") {
+      /*
+      ADMIN / OWNER LIST
+      */
+
+      if (
+        action === "list"
+      ) {
 
         const ownerKey =
           String(
@@ -947,14 +1417,17 @@ async function handleRequest(
           );
 
         if (!ownerKey) {
+
           json(
             res,
             400,
             {
-              ok:false,
-              error:"Owner key diperlukan."
+              ok: false,
+              error:
+                "Owner key diperlukan."
             }
           );
+
           return;
         }
 
@@ -965,7 +1438,8 @@ async function handleRequest(
           links
             .filter(
               (link) =>
-                link.ownerKey === ownerKey
+                link.ownerKey ===
+                ownerKey
             )
             .map(
               (link) =>
@@ -975,22 +1449,30 @@ async function handleRequest(
                 )
             )
             .sort(
-              (a,b) =>
-                Date.parse(b.createdAt) -
-                Date.parse(a.createdAt)
+              (a, b) =>
+                Date.parse(
+                  b.createdAt
+                ) -
+                Date.parse(
+                  a.createdAt
+                )
             );
 
         json(
           res,
           200,
           {
-            ok:true,
-            links:owned
+            ok: true,
+            links: owned
           }
         );
 
         return;
       }
+
+      /*
+      GET SINGLE LINK
+      */
 
       const alias =
         normalizeAlias(
@@ -1003,8 +1485,9 @@ async function handleRequest(
           res,
           400,
           {
-            ok:false,
-            error:"Alias diperlukan."
+            ok: false,
+            error:
+              "Alias diperlukan."
           }
         );
 
@@ -1020,23 +1503,28 @@ async function handleRequest(
           res,
           404,
           {
-            ok:false,
-            error:"Shortlink tidak ditemukan."
+            ok: false,
+            error:
+              "Shortlink tidak ditemukan."
           }
         );
 
         return;
       }
 
-      if (isExpired(link)) {
+      if (
+        isExpired(link)
+      ) {
 
         json(
           res,
           410,
           {
-            ok:false,
-            error:"Shortlink sudah expired.",
-            code:"EXPIRED"
+            ok: false,
+            error:
+              "Shortlink sudah expired.",
+            code:
+              "EXPIRED"
           }
         );
 
@@ -1047,7 +1535,7 @@ async function handleRequest(
         res,
         200,
         {
-          ok:true,
+          ok: true,
           link:
             publicLink(link)
         }
@@ -1056,14 +1544,23 @@ async function handleRequest(
       return;
     }
 
-    if (method !== "POST") {
+    /*
+    ====================================================
+    POST
+    ====================================================
+    */
+
+    if (
+      method !== "POST"
+    ) {
 
       json(
         res,
         405,
         {
-          ok:false,
-          error:"Method tidak didukung."
+          ok: false,
+          error:
+            "Method tidak didukung."
         }
       );
 
@@ -1078,17 +1575,30 @@ async function handleRequest(
         body.action || ""
       );
 
-    if (action === "create") {
+    /*
+    ====================================================
+    CREATE
+    ====================================================
+    */
+
+    if (
+      action === "create"
+    ) {
 
       const link =
-        await createLink(body);
+        await createLink(
+          body
+        );
 
       json(
         res,
         201,
         {
-          ok:true,
-          ownerKey:link.ownerKey,
+          ok: true,
+
+          ownerKey:
+            link.ownerKey,
+
           link:
             publicLink(link)
         }
@@ -1097,7 +1607,15 @@ async function handleRequest(
       return;
     }
 
-    if (action === "update") {
+    /*
+    ====================================================
+    UPDATE
+    ====================================================
+    */
+
+    if (
+      action === "update"
+    ) {
 
       const link =
         await updateExistingLink(
@@ -1108,7 +1626,8 @@ async function handleRequest(
         res,
         200,
         {
-          ok:true,
+          ok: true,
+
           link:
             publicLink(link)
         }
@@ -1117,7 +1636,15 @@ async function handleRequest(
       return;
     }
 
-    if (action === "delete") {
+    /*
+    ====================================================
+    DELETE
+    ====================================================
+    */
+
+    if (
+      action === "delete"
+    ) {
 
       const alias =
         normalizeAlias(
@@ -1133,8 +1660,9 @@ async function handleRequest(
           res,
           404,
           {
-            ok:false,
-            error:"Shortlink tidak ditemukan."
+            ok: false,
+            error:
+              "Shortlink tidak ditemukan."
           }
         );
 
@@ -1150,8 +1678,9 @@ async function handleRequest(
           res,
           403,
           {
-            ok:false,
-            error:"Tidak memiliki akses."
+            ok: false,
+            error:
+              "Tidak memiliki akses."
           }
         );
 
@@ -1166,14 +1695,22 @@ async function handleRequest(
         res,
         200,
         {
-          ok:true
+          ok: true
         }
       );
 
       return;
     }
 
-    if (action === "verify") {
+    /*
+    ====================================================
+    PASSWORD VERIFY
+    ====================================================
+    */
+
+    if (
+      action === "verify"
+    ) {
 
       const alias =
         normalizeAlias(
@@ -1189,36 +1726,42 @@ async function handleRequest(
           res,
           404,
           {
-            ok:false,
-            error:"Shortlink tidak ditemukan."
+            ok: false,
+            error:
+              "Shortlink tidak ditemukan."
           }
         );
 
         return;
       }
 
-      if (isExpired(link)) {
+      if (
+        isExpired(link)
+      ) {
 
         json(
           res,
           410,
           {
-            ok:false,
-            error:"Shortlink sudah expired."
+            ok: false,
+            error:
+              "Shortlink sudah expired."
           }
         );
 
         return;
       }
 
-      if (!link.passwordHash) {
+      if (
+        !link.passwordHash
+      ) {
 
         json(
           res,
           200,
           {
-            ok:true,
-            accessToken:""
+            ok: true,
+            accessToken: ""
           }
         );
 
@@ -1241,8 +1784,9 @@ async function handleRequest(
           res,
           401,
           {
-            ok:false,
-            error:"Password salah."
+            ok: false,
+            error:
+              "Password salah."
           }
         );
 
@@ -1259,7 +1803,7 @@ async function handleRequest(
         res,
         200,
         {
-          ok:true,
+          ok: true,
           accessToken
         }
       );
@@ -1267,7 +1811,15 @@ async function handleRequest(
       return;
     }
 
-    if (action === "track") {
+    /*
+    ====================================================
+    TRACK CLICK
+    ====================================================
+    */
+
+    if (
+      action === "track"
+    ) {
 
       const alias =
         normalizeAlias(
@@ -1283,29 +1835,41 @@ async function handleRequest(
           res,
           404,
           {
-            ok:false,
-            error:"Shortlink tidak ditemukan."
+            ok: false,
+            error:
+              "Shortlink tidak ditemukan."
           }
         );
 
         return;
       }
 
-      if (isExpired(link)) {
+      if (
+        isExpired(link)
+      ) {
 
         json(
           res,
           410,
           {
-            ok:false,
-            error:"Shortlink sudah expired."
+            ok: false,
+            error:
+              "Shortlink sudah expired.",
+            code:
+              "EXPIRED"
           }
         );
 
         return;
       }
 
-      if (link.passwordHash) {
+      /*
+      Password protection
+      */
+
+      if (
+        link.passwordHash
+      ) {
 
         const validToken =
           validateAccessToken(
@@ -1320,8 +1884,9 @@ async function handleRequest(
             res,
             401,
             {
-              ok:false,
-              error:"Password verification diperlukan."
+              ok: false,
+              error:
+                "Password verification diperlukan."
             }
           );
 
@@ -1329,11 +1894,37 @@ async function handleRequest(
         }
       }
 
+      /*
+      ==================================================
+      ATOMIC CLICK COUNTER
+      ==================================================
+
+      INCR Redis bersifat atomic.
+
+      Jadi:
+
+      User A -> +1
+      User B -> +1
+
+      tidak akan saling menimpa.
+      */
+
+      const newClicks =
+        await incrementClickCount(
+          alias
+        );
+
       link.clicks =
-        Number(link.clicks || 0) + 1;
+        newClicks;
 
       link.lastClickAt =
         new Date().toISOString();
+
+      /*
+      ==================================================
+      CLICK LOG
+      ==================================================
+      */
 
       const clickData =
         buildClickData(req);
@@ -1343,6 +1934,7 @@ async function handleRequest(
           link.clickLog
         )
       ) {
+
         link.clickLog = [];
       }
 
@@ -1359,6 +1951,14 @@ async function handleRequest(
           link.clickLog.slice(-50);
       }
 
+      /*
+      ==================================================
+      SIMPAN METADATA
+      ==================================================
+
+      saveLink tidak menimpa counter Redis.
+      */
+
       await saveLink(link);
 
       const destination =
@@ -1371,7 +1971,11 @@ async function handleRequest(
         res,
         200,
         {
-          ok:true,
+          ok: true,
+
+          clicks:
+            newClicks,
+
           destination
         }
       );
@@ -1379,12 +1983,19 @@ async function handleRequest(
       return;
     }
 
+    /*
+    ====================================================
+    UNKNOWN ACTION
+    ====================================================
+    */
+
     json(
       res,
       400,
       {
-        ok:false,
-        error:"Action tidak dikenali."
+        ok: false,
+        error:
+          "Action tidak dikenali."
       }
     );
 
@@ -1399,7 +2010,8 @@ async function handleRequest(
       res,
       error.status || 500,
       {
-        ok:false,
+        ok: false,
+
         error:
           error.message ||
           "Internal server error."
