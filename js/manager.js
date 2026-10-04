@@ -62,6 +62,7 @@ function resetForm() {
   elements.formTitle.textContent =
     "Create Shortlink";
 
+  elements.saveButton.dataset.labelMobile = "Create";
   elements.saveButton.innerHTML =
     `<i class="fa-solid fa-wand-magic-sparkles"></i> <span>Create Link</span>`;
 
@@ -462,6 +463,7 @@ function startEdit(alias) {
   elements.formTitle.textContent =
     `Edit: ${alias}`;
 
+  elements.saveButton.dataset.labelMobile = "Save";
   elements.saveButton.innerHTML =
     `<i class="fa-solid fa-floppy-disk"></i> <span>Save Changes</span>`;
 
