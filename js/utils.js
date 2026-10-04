@@ -222,6 +222,7 @@ export function setLoading(button, loading, loadingText = "Loading...") {
 
   if (loading) {
     button.dataset.oldHtml = button.innerHTML;
+    button.dataset.loading = "true";
     button.disabled = true;
     button.innerHTML =
       `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(loadingText)}`;
@@ -232,6 +233,8 @@ export function setLoading(button, loading, loadingText = "Loading...") {
       button.innerHTML = button.dataset.oldHtml;
       delete button.dataset.oldHtml;
     }
+
+    delete button.dataset.loading;
   }
 }
 
