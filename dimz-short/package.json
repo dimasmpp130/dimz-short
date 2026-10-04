@@ -1,9 +1,0 @@
-{
-  "name": "DIMZ/LINKS",
-  "version": "1.0.0",
-  "private": true,
-  "description": "DIMZLINK lightweight URL shortener",
-  "dependencies": {
-    "@upstash/redis": "^1.35.0"
-  }
-}
