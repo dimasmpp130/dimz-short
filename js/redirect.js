@@ -380,7 +380,12 @@ export async function initRedirect(alias) {
     if (error?.status === 404) {
       showError(
         "Link tidak ditemukan",
-        "Shortlink tersebut tidak tersedia."
+        "Shortlink ini tidak tersedia atau mungkin sudah dihapus."
+      );
+
+      setStatus(
+        "Periksa kembali alamat shortlink atau minta link baru.",
+        ""
       );
 
       return;
@@ -390,6 +395,11 @@ export async function initRedirect(alias) {
       showError(
         "Link sudah expired",
         "Shortlink ini sudah melewati masa berlaku."
+      );
+
+      setStatus(
+        "Silakan gunakan link yang masih aktif.",
+        ""
       );
 
       return;
