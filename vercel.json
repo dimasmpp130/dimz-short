@@ -1,7 +1,7 @@
 {
   "redirects": [
     {
-      "source": "/shortlink.html",
+      "source": "/index.html",
       "destination": "/shortlink",
       "permanent": true
     }
@@ -9,11 +9,11 @@
   "rewrites": [
     {
       "source": "/shortlink",
-      "destination": "/shortlink.html"
+      "destination": "/index.html"
     },
     {
       "source": "/:alias([A-Za-z0-9_-]{4,32})",
-      "destination": "/shortlink.html?alias=$1"
+      "destination": "/index.html?alias=$1"
     }
   ]
 }
