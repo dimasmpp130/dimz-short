@@ -13,14 +13,14 @@ import {
 
 import {
   $,
-  escapeHtml,
   sleep
 } from "./utils.js";
 
 let currentAlias = "";
 let currentToken = "";
+
 let countdownFinished = false;
-let userInteracted = false;
+let verificationChecked = false;
 let protectedLink = false;
 
 function setStatus(message, type = "") {
@@ -35,73 +35,94 @@ function setStatus(message, type = "") {
 }
 
 function showError(title, message) {
+  const titleElement = $("#redirectTitle");
+  const messageElement = $("#redirectMessage");
+  const countdown = $("#countdown");
+  const botWrap = $("#botCheckWrap");
+  const continueBtn = $("#continueBtn");
+  const passwordPanel = $("#passwordPanel");
 
-  $("#redirectTitle").textContent = title;
+  if (titleElement) {
+    titleElement.textContent = title;
+  }
 
-  $("#redirectMessage").textContent = message;
+  if (messageElement) {
+    messageElement.textContent = message;
+  }
 
-  $("#countdown").classList.add("hidden");
-
-  $("#botCheckWrap").classList.add("hidden");
-
-  $("#continueBtn").classList.add("hidden");
-
-  $("#passwordPanel").classList.add("hidden");
+  countdown?.classList.add("hidden");
+  botWrap?.classList.add("hidden");
+  continueBtn?.classList.add("hidden");
+  passwordPanel?.classList.add("hidden");
 
   setStatus(message, "error");
 }
 
-function markInteraction() {
-  userInteracted = true;
-  updateContinueButton();
-}
-
 function updateContinueButton() {
-
   const button = $("#continueBtn");
 
   if (!button) {
     return;
   }
 
-  button.disabled =
-    !countdownFinished ||
-    !userInteracted;
+  button.disabled = !(
+    countdownFinished &&
+    verificationChecked
+  );
 }
 
 async function startCountdown() {
-
   const countdown = $("#countdown");
-
   const botWrap = $("#botCheckWrap");
+  const continueBtn = $("#continueBtn");
 
   if (!countdown) {
     return;
   }
 
-  countdown.classList.remove("hidden");
-
-  botWrap.classList.remove("hidden");
-
   countdownFinished = false;
+  verificationChecked = false;
+
+  countdown.classList.remove("hidden");
+  botWrap?.classList.remove("hidden");
+
+  if (continueBtn) {
+    continueBtn.classList.remove("hidden");
+    continueBtn.disabled = true;
+    continueBtn.innerHTML =
+      `<i class="fa-solid fa-arrow-right"></i> Lanjutkan`;
+  }
+
+  const totalSeconds = Math.max(
+    0,
+    Number(CONFIG.COUNTDOWN_SECONDS) || 0
+  );
+
+  if (totalSeconds === 0) {
+    countdown.textContent = "✓";
+    countdownFinished = true;
+
+    updateContinueButton();
+
+    setStatus(
+      "Centang verifikasi lalu lanjutkan.",
+      "success"
+    );
+
+    return;
+  }
 
   for (
-    let seconds = CONFIG.COUNTDOWN_SECONDS;
-    seconds >= 0;
+    let seconds = totalSeconds;
+    seconds > 0;
     seconds--
   ) {
-
     countdown.textContent = seconds;
-
-    if (seconds === 0) {
-      break;
-    }
 
     await sleep(1000);
   }
 
   countdownFinished = true;
-
   countdown.textContent = "✓";
 
   updateContinueButton();
@@ -113,38 +134,46 @@ async function startCountdown() {
 }
 
 async function submitPassword() {
-
   const input = $("#redirectPassword");
   const button = $("#verifyPassword");
 
-  const password = input?.value || "";
+  const password = input?.value?.trim() || "";
 
   if (!password) {
-    setStatus("Masukkan password terlebih dahulu.", "error");
+    setStatus(
+      "Masukkan password terlebih dahulu.",
+      "error"
+    );
+
     return;
   }
 
-  button.disabled = true;
+  if (button) {
+    button.disabled = true;
 
-  button.innerHTML =
-    `<i class="fa-solid fa-spinner fa-spin"></i> Checking...`;
+    button.innerHTML =
+      `<i class="fa-solid fa-spinner fa-spin"></i> Checking...`;
+  }
 
   try {
+    const result = await verifyPassword(
+      currentAlias,
+      password
+    );
 
-    const result =
-      await verifyPassword(
-        currentAlias,
-        password
-      );
-
-    currentToken = result.accessToken || "";
+    currentToken =
+      result?.accessToken || "";
 
     protectedLink = false;
 
-    $("#passwordPanel").classList.add("hidden");
+    $("#passwordPanel")?.classList.add("hidden");
 
-    $("#redirectMessage").textContent =
-      "Password benar. Menyiapkan link...";
+    const message = $("#redirectMessage");
+
+    if (message) {
+      message.textContent =
+        "Password benar. Menyiapkan link...";
+    }
 
     setStatus(
       "Password berhasil diverifikasi.",
@@ -154,29 +183,33 @@ async function submitPassword() {
     await startCountdown();
 
   } catch (error) {
-
     setStatus(
       error?.data?.error ||
+      error?.message ||
       "Password salah.",
       "error"
     );
 
   } finally {
+    if (button) {
+      button.disabled = false;
 
-    button.disabled = false;
-
-    button.innerHTML =
-      `<i class="fa-solid fa-unlock"></i> Verify Password`;
+      button.innerHTML =
+        `<i class="fa-solid fa-unlock"></i> Verify Password`;
+    }
   }
 }
 
 async function continueRedirect() {
-
   const button = $("#continueBtn");
+
+  if (!button) {
+    return;
+  }
 
   if (
     !countdownFinished ||
-    !userInteracted
+    !verificationChecked
   ) {
     return;
   }
@@ -184,20 +217,23 @@ async function continueRedirect() {
   button.disabled = true;
 
   button.innerHTML =
-    `<i class="fa-solid fa-spinner fa-spin"></i> Preparing...`;
+    `<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan...`;
 
-  setStatus("Mencatat klik...", "");
+  setStatus(
+    "Mencatat klik...",
+    ""
+  );
 
   try {
+    const result = await recordClick(
+      currentAlias,
+      currentToken
+    );
 
-    const result =
-      await recordClick(
-        currentAlias,
-        currentToken
+    if (!result?.destination) {
+      throw new Error(
+        "Destination tidak tersedia."
       );
-
-    if (!result.destination) {
-      throw new Error("Destination tidak tersedia.");
     }
 
     setStatus(
@@ -207,15 +243,17 @@ async function continueRedirect() {
 
     await sleep(150);
 
-    window.location.replace(result.destination);
+    window.location.replace(
+      result.destination
+    );
 
   } catch (error) {
-
     console.error(error);
 
     button.disabled = false;
 
-    button.textContent = "Continue";
+    button.innerHTML =
+      `<i class="fa-solid fa-arrow-right"></i> Lanjutkan`;
 
     setStatus(
       error?.data?.error ||
@@ -227,101 +265,103 @@ async function continueRedirect() {
 }
 
 function attachInteractionListeners() {
+  const botCheck = $("#botCheck");
+  const continueBtn = $("#continueBtn");
+  const verifyButton = $("#verifyPassword");
+  const passwordInput = $("#redirectPassword");
 
-  [
-    document,
-    $("#redirectCard")
-  ].forEach((element) => {
-
-    if (!element) {
-      return;
-    }
-
-    [
-      "pointerdown",
-      "keydown",
-      "touchstart"
-    ].forEach((eventName) => {
-
-      element.addEventListener(
-        eventName,
-        markInteraction,
-        { passive: true }
-      );
-
-    });
-
-  });
-
-  $("#botCheck")?.addEventListener(
+  botCheck?.addEventListener(
     "change",
-    (event) => {
-
-      if (event.target.checked) {
-        userInteracted = true;
-      }
+    event => {
+      verificationChecked =
+        Boolean(event.target.checked);
 
       updateContinueButton();
+
+      if (verificationChecked) {
+        setStatus(
+          countdownFinished
+            ? "Verifikasi berhasil. Silakan lanjutkan."
+            : "Verifikasi berhasil. Tunggu countdown selesai.",
+          "success"
+        );
+      } else {
+        setStatus(
+          "Centang verifikasi lalu lanjutkan.",
+          ""
+        );
+      }
     }
   );
 
-  $("#continueBtn")?.addEventListener(
+  continueBtn?.addEventListener(
     "click",
     continueRedirect
   );
 
-  $("#verifyPassword")?.addEventListener(
+  verifyButton?.addEventListener(
     "click",
     submitPassword
   );
 
-  $("#redirectPassword")?.addEventListener(
+  passwordInput?.addEventListener(
     "keydown",
-    (event) => {
-
+    event => {
       if (event.key === "Enter") {
+        event.preventDefault();
         submitPassword();
       }
-
     }
   );
 }
 
 export async function initRedirect(alias) {
-
   currentAlias = alias;
+
+  countdownFinished = false;
+  verificationChecked = false;
+  currentToken = "";
+  protectedLink = false;
 
   attachInteractionListeners();
 
   try {
-
     const result =
       await getPublicLink(alias);
 
-    const link = result.link;
+    const link = result?.link;
 
     if (!link) {
-      throw new Error("Shortlink tidak ditemukan.");
+      throw new Error(
+        "Shortlink tidak ditemukan."
+      );
     }
 
     protectedLink =
       Boolean(link.passwordProtected);
 
-    if (protectedLink) {
+    const continueBtn = $("#continueBtn");
+    const botWrap = $("#botCheckWrap");
+    const countdown = $("#countdown");
+    const passwordPanel = $("#passwordPanel");
 
+    if (protectedLink) {
       $("#redirectTitle").textContent =
         "Password required";
 
       $("#redirectMessage").textContent =
         "Link ini dilindungi password.";
 
-      $("#countdown").classList.add("hidden");
+      countdown?.classList.add("hidden");
+      botWrap?.classList.add("hidden");
+      continueBtn?.classList.add("hidden");
 
-      $("#botCheckWrap").classList.add("hidden");
+      passwordPanel?.classList.remove("hidden");
 
-      $("#continueBtn").classList.add("hidden");
-
-      $("#passwordPanel").classList.remove("hidden");
+      setStatus(
+        "Masukkan password untuk melanjutkan.",
+        ""
+      );
 
       return;
     }
@@ -335,11 +375,9 @@ export async function initRedirect(alias) {
     await startCountdown();
 
   } catch (error) {
-
     console.error(error);
 
-    if (error.status === 404) {
-
+    if (error?.status === 404) {
       showError(
         "Link tidak ditemukan",
         "Shortlink tersebut tidak tersedia."
@@ -348,8 +386,7 @@ export async function initRedirect(alias) {
       return;
     }
 
-    if (error.status === 410) {
-
+    if (error?.status === 410) {
       showError(
         "Link sudah expired",
         "Shortlink ini sudah melewati masa berlaku."
