@@ -6,7 +6,7 @@ let generated = false;
 
 export function setQRUrl(url) { currentQRUrl = url; generated = false; }
 
-function addLogo(container, logoSrc = "/assets/icon/qr.png") {
+function addLogo(container, logoSrc = "/assets/icon/qr-create.png") {
   const logo = document.createElement("img");
   logo.className = "qr-logo";
   logo.src = logoSrc;
@@ -16,7 +16,7 @@ function addLogo(container, logoSrc = "/assets/icon/qr.png") {
   container.appendChild(logo);
 }
 
-export async function renderQR(container, url, logoSrc = "/assets/icon/qr.png") {
+export async function renderQR(container, url, logoSrc = "/assets/icon/qr-create.png") {
   await loadScriptOnce(CONFIG.QR_CDN);
   container.innerHTML = "";
   container.classList.remove("qr-overlay");
@@ -67,8 +67,8 @@ async function downloadSvg() {
   if (!qr) return;
   let qrData = qr.tagName.toLowerCase() === "canvas" ? qr.toDataURL("image/png") : qr.src;
   if (!qrData) return;
-  let logoData = "/assets/icon/qr.png";
-  try { logoData = await imageToData("/assets/icon/qr.png"); } catch {}
+  let logoData = "/assets/icon/qr-create.png";
+  try { logoData = await imageToData("/assets/icon/qr-create.png"); } catch {}
   const esc = (v) => String(v).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("<","&lt;");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720"><rect width="720" height="720" fill="#fff"/><image href="${esc(qrData)}" x="60" y="60" width="600" height="600"/><rect x="300" y="300" width="120" height="120" rx="18" fill="#fff"/><image href="${esc(logoData)}" x="310" y="310" width="100" height="100" preserveAspectRatio="xMidYMid meet"/></svg>`;
   const blob=new Blob([svg],{type:"image/svg+xml"});
@@ -78,7 +78,7 @@ async function downloadSvg() {
 export function initQR() {
   $("#generateQr")?.addEventListener("click", async () => {
     if (!currentQRUrl) return toast("Shortlink belum tersedia.");
-    try { await renderQR($("#qrCanvas"), currentQRUrl, "/assets/icon/qr.png"); }
+    try { await renderQR($("#qrCanvas"), currentQRUrl, "/assets/icon/qr-create.png"); }
     catch (error) { console.error(error); toast("QR gagal dibuat."); }
   });
   $("#downloadQrPng")?.addEventListener("click", () => downloadPng().catch(() => toast("PNG gagal dibuat.")));
