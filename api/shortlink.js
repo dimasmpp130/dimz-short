@@ -535,7 +535,11 @@ async function handleRequest(req, res) {
       }
 
       const alias = normalizeAlias(query.alias);
-      if (!alias) return json(res, 400, { ok: false, error: "Alias diperlukan." });
+      if (!alias) {
+        const links = await listStoredLinks();
+        const owned = links.filter((link) => link.workspaceId === sha256(workspaceId)).map((link) => publicLink(link, true));
+        return json(res, 200, { ok: true, links: owned });
+      }
       const link = await getLink(alias);
       if (!link) return json(res, 404, { ok: false, error: "Shortlink tidak ditemukan." });
       if (isExpired(link)) return json(res, 410, { ok: false, error: "Shortlink sudah kedaluwarsa.", code: "EXPIRED" });
