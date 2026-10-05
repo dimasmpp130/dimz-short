@@ -53,7 +53,7 @@ async function createAfterVerification() {
 
     // Root (/) adalah halaman manager. Jangan lewat /shortlink karena
     // route lama dapat me-redirect dan membuang query ?created=...
-    location.replace(`/?created=${encodeURIComponent(data.link.alias)}`);
+    location.replace(`/shortlink?created=${encodeURIComponent(data.link.alias)}`);
   } catch (error) {
     submitted = false;
     spinner.classList.remove("show");
