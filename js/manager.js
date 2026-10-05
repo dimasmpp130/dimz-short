@@ -424,7 +424,7 @@ async function handleSubmit(event) {
           "dimzlink_pending_create_v1",
           JSON.stringify(payload)
         );
-        window.location.href = "/verify.html?mode=create";
+        window.location.href = "/verify/mode=create";
         return;
       }
 
