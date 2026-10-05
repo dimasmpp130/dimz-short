@@ -426,6 +426,26 @@ input:focus,
   color: var(--danger);
 }
 
+.link-actions .mini-btn {
+  cursor: pointer;
+}
+
+.link-actions .mini-btn.danger:hover {
+  background: #ffe0e3;
+}
+
+@media(max-width:700px) {
+  .link-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .link-actions .mini-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .empty {
   text-align: center;
   padding: 45px 20px;
@@ -666,9 +686,51 @@ body.manager-mode .redirect-view {
   margin: 10px 0;
 }
 
+#qrCanvas {
+  width: 100%;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  justify-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 #qrCanvas img,
-    #qrCanvas canvas {
+#qrCanvas canvas {
+  display: block;
+  width: min(240px, 72vw) !important;
+  height: min(240px, 72vw) !important;
   max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto !important;
+}
+
+#qrCanvas .hint {
+  text-align: center;
+}
+
+#qrCanvas.qr-overlay {
+  display: grid !important;
+  width: 100% !important;
+  position: relative !important;
+  place-items: center !important;
+  justify-items: center !important;
+  align-items: center !important;
+  align-content: center !important;
+}
+
+#qrCanvas.qr-overlay .qr-logo {
+  position: absolute;
+  width: min(48px, 14vw);
+  height: min(48px, 14vw);
+  max-width: none;
+  max-height: none;
+  margin: 0 !important;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .share-grid {
@@ -785,6 +847,25 @@ body.manager-mode .redirect-view {
 
 @media(max-width:480px) {
 
+  #resultModal {
+    padding: 10px;
+  }
+
+  #resultModal .modal-card {
+    width: 100%;
+    max-height: 94vh;
+    padding: 17px;
+    border-radius: 18px;
+  }
+
+  #resultModal .actions {
+    grid-template-columns: 1fr;
+  }
+
+  #resultModal .actions > #generateQr {
+    grid-column: auto;
+  }
+
   .container,
       .redirect-center > .container {
     width: calc(100% - 20px);
@@ -837,8 +918,15 @@ body.manager-mode .redirect-view {
   box-sizing: border-box;
 }
 
+#resultModal .actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 #resultModal .actions > #generateQr {
-  flex: 1 1 100%;
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .result-analysis {
