@@ -196,24 +196,19 @@ async function redisSetRemove(alias) {
 }
 
 async function getLink(alias) {
-  const [raw, clicksRaw] = await Promise.all([
-    redisCommand("GET", `dimzlink:${alias}`),
-    redisCommand("GET", `dimzlink:clicks:${alias}`)
-  ]);
+  const raw = await redisCommand("GET", `dimzlink:${alias}`);
   if (!raw) return null;
   const link = JSON.parse(raw);
-  link.clicks = Number(clicksRaw || link.clicks || 0);
+  link.clicks = Number(await redisCommand("GET", `dimzlink:clicks:${alias}`) || link.clicks || 0);
   return link;
 }
 
 async function saveLink(link) {
   const data = { ...link };
   delete data.clicks;
-  await Promise.all([
-    redisCommand("SET", `dimzlink:${link.alias}`, JSON.stringify(data)),
-    redisCommand("SET", `dimzlink:clicks:${link.alias}`, Number(link.clicks || 0)),
-    redisSetAdd(link.alias)
-  ]);
+  await redisCommand("SET", `dimzlink:${link.alias}`, JSON.stringify(data));
+  await redisCommand("SET", `dimzlink:clicks:${link.alias}`, Number(link.clicks || 0));
+  await redisSetAdd(link.alias);
 }
 
 async function deleteStoredLink(alias) {
@@ -245,10 +240,13 @@ async function listStoredLinks() {
     }
   }
 
-  const links = (await Promise.all([...new Set(aliases)].map(async (alias) => {
-    try { return await getLink(normalizeAlias(alias)); }
-    catch { return null; }
-  }))).filter((link) => link?.alias);
+  const links = [];
+  for (const alias of [...new Set(aliases)]) {
+    try {
+      const link = await getLink(normalizeAlias(alias));
+      if (link?.alias) links.push(link);
+    } catch {}
+  }
   return links;
 }
 
@@ -388,7 +386,7 @@ async function createLink(input, req, workspaceId) {
     error.status = 400;
     throw error;
   }
-  if (Number(await redisCommand("EXISTS", `dimzlink:${alias}`)) > 0) {
+  if (await getLink(alias)) {
     const error = new Error("Alias sudah digunakan. Pilih alias lain.");
     error.status = 409;
     throw error;
