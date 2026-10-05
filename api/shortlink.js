@@ -155,11 +155,22 @@ function validUrl(value) {
  * Domain shortener sendiri tidak boleh dijadikan
  * destination URL.
  *
+ * Subdomain juga ikut diblokir.
+ *
+ * Contoh yang diblokir:
+ *
+ * https://dimz-short.vercel.app
+ * https://dimz-short.vercel.app/test
+ * https://abc.dimz-short.vercel.app
+ * https://link.dimz-wtf.web.id
+ * https://sub.link.dimz-wtf.web.id/test
+ *
  * Tambahkan domain lain ke array ini jika diperlukan.
  */
 
 const BLOCKED_HOSTS = [
-  "dimz-short.vercel.app"
+  "dimz-short.vercel.app",
+  "link.dimz-wtf.web.id"
 ];
 
 function isBlockedUrl(value) {
@@ -205,6 +216,7 @@ function validateRules(rules) {
       typeof value !== "string" ||
       !validUrl(value)
     ) {
+
       throw new Error(
         `Redirect rule "${key}" memiliki URL tidak valid.`
       );
@@ -911,12 +923,16 @@ async function generateUniqueAlias() {
   );
 }
 
-async function verifyRecaptcha(token, req) {
+async function verifyRecaptcha(
+  token,
+  req
+) {
 
   if (
     process.env.DIMZLINK_CAPTCHA_ENABLED !==
     "true"
   ) {
+
     return true;
   }
 
@@ -1080,12 +1096,8 @@ async function createLink(
   /*
    * BLOKIR DOMAIN SENDIRI
    *
-   * Ini memastikan user tidak dapat membuat
-   * shortlink yang mengarah ke:
-   *
-   * https://dimz-short.vercel.app
-   * https://dimz-short.vercel.app/test
-   * dan path lainnya.
+   * Jika destination termasuk domain yang ada
+   * di BLOCKED_HOSTS, proses create dihentikan.
    */
 
   if (
@@ -1096,10 +1108,12 @@ async function createLink(
 
     const error =
       new Error(
-        "URL tersebut tidak dapat digunakan sebagai tujuan shortlink."
+        "Domain tersebut tidak dapat digunakan sebagai tujuan shortlink."
       );
 
     error.status = 400;
+    error.code =
+      "BLOCKED_DESTINATION";
 
     throw error;
   }
@@ -1262,10 +1276,8 @@ async function updateExistingLink(
   /*
    * BLOKIR DOMAIN SENDIRI SAAT UPDATE
    *
-   * Supaya shortlink lama juga tidak bisa
-   * diedit menjadi:
-   *
-   * https://dimz-short.vercel.app/...
+   * Shortlink lama juga tidak dapat diedit
+   * menjadi destination yang diblokir.
    */
 
   if (
@@ -1276,10 +1288,12 @@ async function updateExistingLink(
 
     const error =
       new Error(
-        "URL tersebut tidak dapat digunakan sebagai tujuan shortlink."
+        "Domain tersebut tidak dapat digunakan sebagai tujuan shortlink."
       );
 
     error.status = 400;
+    error.code =
+      "BLOCKED_DESTINATION";
 
     throw error;
   }
@@ -2006,7 +2020,10 @@ async function handleRequest(
 
         error:
           error.message ||
-          "Internal server error."
+          "Internal server error.",
+
+        code:
+          error.code || null
       }
     );
   }
