@@ -101,13 +101,6 @@ async function loadDashboard() {
     allLinks=Array.isArray(data.links)?data.links:[];
     renderStats(data.stats||{});
     renderTable();
-
-    // Analytics agregat berat dimuat setelah tabel sudah tampil.
-    if (data.statsPending) {
-      api(`${API_URL}?action=stats`).then((statsData)=>{
-        if (statsData?.stats) renderStats(statsData.stats);
-      }).catch(()=>{});
-    }
   } catch(e) {
     if(e.status===401){showLogin();return;}
     toast(e.message||"Gagal memuat dashboard.");
@@ -126,13 +119,8 @@ function openEdit(link) {
 }
 function closeEdit(){selectedAlias=null;$("editModal").classList.add("hidden");}
 
-async function openStats(link) {
-  $("clickModal").classList.remove("hidden");
-  $("clickSummary").textContent=`${link.alias} · Memuat analytics...`;
-  $("clickDetails").innerHTML=`<div class="empty">Memuat aktivitas...</div>`;
-  try {
-    const data=await api(`${API_URL}?action=analytics&alias=${encodeURIComponent(link.alias)}`);
-    const events=Array.isArray(data.analytics?.events)?data.analytics.events:[];
+function openStats(link) {
+  const events=Array.isArray(link.recentClicks)?link.recentClicks:[];
   const count=(field)=>events.reduce((m,e)=>{const k=e?.[field]||"Tidak diketahui";m[k]=(m[k]||0)+1;return m;},{});
   const hours=events.reduce((m,e)=>{const d=e?.time?new Date(e.time):null;const k=d&&!Number.isNaN(d.getTime())?`${String(d.getHours()).padStart(2,"0")}:00`:"Tidak diketahui";m[k]=(m[k]||0)+1;return m;},{});
   $("clickSummary").textContent=`${link.alias} · ${num(link.clicks)} klik · ${num(new Set(events.map(e=>e.visitor).filter(Boolean)).size)} pengunjung unik`;
@@ -140,10 +128,7 @@ async function openStats(link) {
   renderMap("osStats",count("os"));
   renderMap("referrerStats",count("referrer"));
   $("clickDetails").innerHTML=events.length?events.map(e=>`<div class="click-item"><div class="click-main"><span class="pill">${esc(e.type||"human")}</span><span class="pill">${esc(e.device||"-")}</span><span class="pill">${esc(e.browser||"-")}</span><span class="pill">${esc(e.country||"-")}</span></div><div class="click-time">${esc(date(e.time))}</div><div class="click-info">OS: ${esc(e.os||"-")} · Bahasa: ${esc(e.language||"-")}<br>Referrer: ${esc(e.referrer||"Langsung")}</div></div>`).join(""):`<div class="empty">Belum ada aktivitas.</div>`;
-  } catch(e) {
-    $("clickSummary").textContent=`${link.alias} · Analytics gagal dimuat`;
-    $("clickDetails").innerHTML=`<div class="empty">${esc(e.message||"Gagal memuat analytics.")}</div>`;
-  }
+  $("clickModal").classList.remove("hidden");
 }
 
 function openQr(link) {
@@ -235,23 +220,14 @@ api().then(data=>{
   if (data.authenticated) {
     sessionStorage.setItem("dimz_admin_authenticated","1");
     showAdmin();
+    // Request ini sudah membawa dashboard lengkap; hindari request kedua.
     allLinks = Array.isArray(data.links) ? data.links : [];
     renderStats(data.stats || {});
     renderTable();
-    if (data.statsPending) {
-      api(`${API_URL}?action=stats`).then((statsData)=>{
-        if (statsData?.stats) renderStats(statsData.stats);
-      }).catch(()=>{});
-    }
   } else {
     showLogin();
   }
 }).catch((e)=>{
-  // Jangan logout/hilangkan dashboard hanya karena request refresh gagal.
-  // Cookie admin tetap menjadi sumber autentikasi; logout hanya lewat tombol Keluar.
-  if (e?.status === 401) {
-    showLogin();
-  } else if (!hadAdminSession) {
-    showLogin();
-  }
+  if (e?.status === 401) showLogin();
+  else if (!hadAdminSession) showLogin();
 });
