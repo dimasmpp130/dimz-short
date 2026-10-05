@@ -4,13 +4,14 @@
       "source": "/admins.html",
       "destination": "/admins",
       "permanent": true
+    },
+    {
+      "source": "/shortlink",
+      "destination": "/",
+      "permanent": false
     }
   ],
   "rewrites": [
-    {
-      "source": "/shortlink",
-      "destination": "/index.html"
-    },
     {
       "source": "/admins",
       "destination": "/admins.html"
