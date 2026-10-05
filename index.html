@@ -28,6 +28,13 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
     />
     <link rel="stylesheet" href="/assets/css/index.css" />
+    <script>
+      (function () {
+        const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
+        const isManagerRoute = !path || path === "shortlink" || path === "index.html";
+        document.documentElement.classList.add(isManagerRoute ? "manager-route" : "redirect-route");
+      })();
+    </script>
   </head>
 
   <body class="manager-mode">
@@ -271,17 +278,6 @@
                   autocomplete="off"
                 />
               </div>
-
-              <button
-                id="verifyPassword"
-                type="button"
-                class="btn btn-primary"
-                style="width:100%;"
-              >
-                <i class="fa-solid fa-arrow-right"></i>
-
-                Continue
-              </button>
             </div>
 
             <div id="recaptchaWrap" class="recaptcha-wrap hidden"></div>
@@ -339,13 +335,6 @@
 
         <div id="qrCanvas" class="qr-box">
           <span class="hint"> QR akan dibuat saat tombol ditekan. </span>
-        </div>
-
-        <div class="actions">
-          <button id="openResult" class="btn btn-primary" type="button">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-            Buka Shortlink
-          </button>
         </div>
 
         <div class="actions">
