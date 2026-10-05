@@ -121,10 +121,9 @@ function hashLinkPassword(password) {
   return `scrypt$16384$8$1$${salt.toString("hex")}$${hash.toString("hex")}`;
 }
 
-async function getAllLinks({ withEvents = false } = {}) {
+async function getAllLinks() {
   let aliases = await redisCommand("SMEMBERS", "dimzlink:index");
   aliases = Array.isArray(aliases) ? [...new Set(aliases.map(String))] : [];
-
   if (!aliases.length) {
     let cursor = "0";
     do {
@@ -136,49 +135,25 @@ async function getAllLinks({ withEvents = false } = {}) {
       }
     } while (cursor !== "0");
     aliases = [...new Set(aliases)];
-    if (aliases.length) {
-      // Migration fallback only; normal dashboard reads the index directly.
-      await Promise.all(aliases.map((alias) => redisCommand("SADD", "dimzlink:index", alias)));
-    }
+    for (const alias of aliases) await redisCommand("SADD", "dimzlink:index", alias);
   }
 
-  if (!aliases.length) return [];
-
-  // MGET mengubah pola 2-3 request Redis per link menjadi hanya beberapa request
-  // untuk seluruh daftar, sehingga dashboard tetap cepat walaupun link banyak.
-  const chunks = [];
-  for (let i = 0; i < aliases.length; i += 50) chunks.push(aliases.slice(i, i + 50));
-  const batches = await Promise.all(chunks.map(async (chunk) => {
-    const [rawLinks, rawClicks] = await Promise.all([
-      redisCommand("MGET", ...chunk.map((alias) => `dimzlink:${alias}`)),
-      redisCommand("MGET", ...chunk.map((alias) => `dimzlink:clicks:${alias}`))
-    ]);
-    return { chunk, rawLinks: Array.isArray(rawLinks) ? rawLinks : [], rawClicks: Array.isArray(rawClicks) ? rawClicks : [] };
-  }));
-
-  const links = [];
-  const linkValues = [];
-  const clickValues = [];
-  for (const batch of batches) {
-    linkValues.push(...batch.rawLinks);
-    clickValues.push(...batch.rawClicks);
-  }
-
-  for (let i = 0; i < aliases.length; i++) {
+  const links = (await Promise.all(aliases.map(async (alias) => {
     try {
-      const raw = linkValues[i];
-      if (!raw) continue;
+      const [raw, clicksRaw, eventsRaw] = await Promise.all([
+        redisCommand("GET", `dimzlink:${alias}`),
+        redisCommand("GET", `dimzlink:clicks:${alias}`),
+        redisCommand("LRANGE", `dimzlink:events:${alias}`, 0, 499)
+      ]);
+      if (!raw) return null;
       const link = JSON.parse(raw);
-      link.clicks = Number(clickValues[i] || link.clicks || 0);
-      if (withEvents) {
-        const eventsRaw = await redisCommand("LRANGE", `dimzlink:events:${link.alias}`, 0, 499);
-        link.events = (Array.isArray(eventsRaw) ? eventsRaw : []).map((x) => {
-          try { return JSON.parse(x); } catch { return null; }
-        }).filter(Boolean);
-      }
-      links.push(link);
-    } catch {}
-  }
+      link.clicks = Number(clicksRaw || link.clicks || 0);
+      link.events = (Array.isArray(eventsRaw) ? eventsRaw : []).map((x) => {
+        try { return JSON.parse(x); } catch { return null; }
+      }).filter(Boolean);
+      return link;
+    } catch { return null; }
+  }))).filter(Boolean);
   return links;
 }
 
@@ -267,17 +242,6 @@ function csvEscape(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-async function getLinkAnalytics(alias) {
-  const raw = await redisCommand("GET", `dimzlink:${alias}`);
-  if (!raw) { const e = new Error("Shortlink tidak ditemukan."); e.status = 404; throw e; }
-  const link = JSON.parse(raw);
-  const eventsRaw = await redisCommand("LRANGE", `dimzlink:events:${alias}`, 0, 499);
-  const events = (Array.isArray(eventsRaw) ? eventsRaw : []).map((x) => {
-    try { return JSON.parse(x); } catch { return null; }
-  }).filter(Boolean);
-  return { alias: link.alias, clicks: Number(link.clicks || 0), events };
-}
-
 async function exportCsv() {
   const links = await getAllLinks();
   const rows = ["Waktu,Alias,Tipe,Negara,Perangkat,OS,Browser,Bahasa,Referrer"];
@@ -310,29 +274,12 @@ export default async function handler(req, res) {
         setSecurityHeaders(res);
         return res.end(csv);
       }
-      if (String(query.action || "") === "analytics") {
-        const alias = String(query.alias || "").trim();
-        if (!alias) return json(res, 400, { ok: false, error: "Alias diperlukan." });
-        return json(res, 200, { ok: true, analytics: await getLinkAnalytics(alias) });
-      }
-
-      if (String(query.action || "") === "stats") {
-        const links = await getAllLinks({ withEvents: true });
-        return json(res, 200, { ok: true, stats: buildStats(links) });
-      }
-
       const links = await getAllLinks();
-      const basicStats = {
-        totalLinks: links.length,
-        totalClicks: links.reduce((sum, link) => sum + Number(link.clicks || 0), 0),
-        uniqueVisitors: 0, human: 0, bot: 0,
-        countries: {}, devices: {}, browsers: {}, languages: {}
-      };
+      const stats = buildStats(links);
       return json(res, 200, {
         ok: true, authenticated: true,
         links: links.map(publicAdminLink).sort((a,b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0)),
-        stats: basicStats,
-        statsPending: true
+        stats
       });
     }
 
