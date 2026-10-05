@@ -70,15 +70,15 @@ The API prevents users from creating or updating a shortlink that points back to
 Currently blocked:
 
 ```text
-info.dimz-wtf.web.id
+link.dimz-wtf.web.id
 ```
 
 For example:
 
 ```text
-https://info.dimz-wtf.web.id
-https://info.dimz-wtf.web.id/test
-https://info.dimz-wtf.web.id/abcd123
+https://link.dimz-wtf.web.id
+https://link.dimz-wtf.web.id/test
+https://link.dimz-wtf.web.id/abcd123
 ```
 
 will be rejected by the API.
