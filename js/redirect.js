@@ -26,7 +26,6 @@ function showError(title, message) {
   $("#recaptchaWrap")?.classList.add("hidden");
   $("#continueBtn")?.classList.add("hidden");
   $("#passwordPanel")?.classList.add("hidden");
-  $("#shortlinkPreview")?.classList.add("hidden");
   setStatus(message, "error");
 }
 
@@ -60,28 +59,6 @@ async function getConfig() {
   }
 
   return data;
-}
-
-function getHostname(url) {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url || "-";
-  }
-}
-
-function renderShortlinkPreview(link) {
-  const preview = $("#shortlinkPreview");
-  if (!preview) return;
-
-  const shortUrl = `${location.origin}/${encodeURIComponent(currentAlias)}`;
-  const destination = link?.destination || "";
-
-  preview.classList.remove("hidden");
-
-  $("#previewShortUrl").textContent = shortUrl;
-  $("#previewAlias").textContent = `/${currentAlias}`;
-  $("#previewDestination").textContent = getHostname(destination);
 }
 
 function resetCountdownUI() {
@@ -169,8 +146,6 @@ async function redirectNow() {
   try {
     setStatus("Memvalidasi dan menyiapkan tujuan...", "");
 
-    // Password-protected links are verified only when Continue is pressed.
-    // This keeps the flow simple: password + reCAPTCHA -> Continue -> redirect.
     if (protectedLink && !currentToken) {
       const result = await verifyPassword(
         currentAlias,
@@ -217,8 +192,6 @@ async function redirectNow() {
 
 function canContinue() {
   const passwordReady = !protectedLink || Boolean($("#redirectPassword")?.value?.trim());
-  // Protected links always require the human verification because the API
-  // requires a valid reCAPTCHA token for the final track/redirect request.
   const verificationReady = protectedLink
     ? Boolean(recaptchaToken)
     : (!verificationEnabled || Boolean(recaptchaToken));
@@ -334,24 +307,6 @@ async function startVerification() {
   await showVerificationAfterCountdown();
 }
 
-async function submitPassword() {
-  updateContinueState();
-
-  const input = $("#redirectPassword");
-  if (!input?.value?.trim()) {
-    setStatus("Masukkan password terlebih dahulu.", "error");
-    input?.focus();
-    return;
-  }
-
-  if (!recaptchaToken) {
-    setStatus('Centang "Saya bukan robot" terlebih dahulu.', "error");
-    return;
-  }
-
-  redirectNow();
-}
-
 export async function initRedirect(alias) {
   currentAlias = alias;
   currentToken = "";
@@ -359,13 +314,11 @@ export async function initRedirect(alias) {
   protectedLink = false;
   currentLink = null;
 
-  $("#verifyPassword")?.addEventListener("click", submitPassword);
-
   $("#redirectPassword")?.addEventListener("input", updateContinueState);
   $("#redirectPassword")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      submitPassword();
+      redirectNow();
     }
   });
 
@@ -394,55 +347,18 @@ export async function initRedirect(alias) {
       link.passwordProtected
     );
 
-    $("#redirectTitle").textContent = "Preparing Your link";
+    $("#redirectTitle").textContent = "Preparing Your Link";
 
     if (protectedLink) {
       $("#redirectMessage").textContent =
-        "Masukkan password dan centang Saya bukan robot. Setelah keduanya valid, tekan Continue untuk membuka link.";
-
-      $("#countdown")?.classList.add("hidden");
-      $("#countdownLabel")?.classList.add("hidden");
+        "Tunggu timer selesai. Setelah itu masukkan password dan centang Saya bukan robot untuk melanjutkan.";
       $("#passwordPanel")?.classList.remove("hidden");
-      $("#verifyPassword")?.classList.add("hidden");
-      $("#recaptchaWrap")?.classList.remove("hidden");
       $("#continueBtn")?.classList.remove("hidden");
       $("#continueBtn").disabled = true;
-
-      if (!verificationEnabled) {
-        setStatus("Masukkan password untuk melanjutkan.");
-        updateContinueState();
-      } else {
-        try {
-          const cfg = config;
-          if (!cfg.recaptchaSiteKey) throw new Error("reCAPTCHA site key belum dikonfigurasi.");
-          await loadRecaptcha();
-          window.grecaptcha.render($("#recaptchaWrap"), {
-            sitekey: cfg.recaptchaSiteKey,
-            callback: (token) => {
-              recaptchaToken = token;
-              updateContinueState();
-              setStatus("Verifikasi berhasil. Pastikan password sudah diisi, lalu tekan Continue.", "success");
-            },
-            "expired-callback": () => {
-              recaptchaToken = "";
-              updateContinueState();
-              setStatus('Verifikasi kedaluwarsa. Centang "Saya bukan robot" kembali.', "error");
-            },
-            "error-callback": () => {
-              recaptchaToken = "";
-              updateContinueState();
-              setStatus("reCAPTCHA gagal dimuat. Coba refresh halaman.", "error");
-            }
-          });
-        } catch (error) {
-          setStatus(error.message || "Gagal memuat verifikasi.", "error");
-        }
-      }
-      return;
+    } else {
+      $("#redirectMessage").textContent =
+        "Tunggu timer selesai, lalu centang Saya bukan robot untuk melanjutkan.";
     }
-
-    $("#redirectMessage").textContent =
-      "Tunggu timer selesai, lalu centang Saya bukan robot untuk melanjutkan.";
 
     await startVerification();
   } catch (error) {
