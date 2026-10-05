@@ -48,7 +48,7 @@ async function createAfterVerification() {
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "Gagal membuat shortlink.");
     sessionStorage.removeItem(STORAGE_KEY);
-    location.replace(`/?created=${encodeURIComponent(data.link.alias)}`);
+    location.replace(`/shortlink?created=${encodeURIComponent(data.link.alias)}`);
   } catch (error) {
     submitted = false;
     spinner.classList.remove("show");

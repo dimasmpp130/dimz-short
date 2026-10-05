@@ -134,6 +134,7 @@ function openStats(link) {
 function openQr(link) {
   qrUrl=`${location.origin}/${encodeURIComponent(link.alias)}`;
   $("adminQrUrl").value=qrUrl;
+  $("adminQrLogo").value="/assets/icon/qr-create.png";
   $("adminQrCanvas").innerHTML="";
   $("qrModal").classList.remove("hidden");
 }
@@ -145,6 +146,13 @@ async function generateAdminQr() {
       await new Promise((resolve,reject)=>{src.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";src.onload=resolve;src.onerror=reject;document.head.appendChild(src);});
     }
     new window.QRCode(box,{text:qrUrl,width:240,height:240,correctLevel:window.QRCode.CorrectLevel.H});
+    setTimeout(()=>{
+      const img=box.querySelector("img,canvas");
+      if(!img)return;
+      box.classList.add("qr-overlay");
+      const logo=document.createElement("img"); logo.className="qr-logo"; logo.src=$("adminQrLogo").value||"/assets/icon/qr-create.png"; logo.alt="Logo";
+      box.appendChild(logo);
+    },120);
   } catch { toast("QR gagal dibuat."); }
 }
 
