@@ -76,9 +76,9 @@ dimz-short.vercel.app
 For example:
 
 ```text
-https://dimz-short.vercel.app
-https://dimz-short.vercel.app/test
-https://sub.dimz-short.vercel.app
+https://info.dimz-wtf.web.id
+https://info.dimz-wtf.web.id/test
+https://info.dimz-wtf.web.id/abcd123
 ```
 
 will be rejected by the API.
