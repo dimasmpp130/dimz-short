@@ -6,10 +6,6 @@ import { initQR } from "./js/qr.js";
 import { initAds } from "./js/ads.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  initShare();
-  initQR();
-  initAds();
-
   const alias = getAliasFromLocation();
 
   if (alias) {
@@ -23,5 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.classList.remove("redirect-mode");
   document.body.classList.add("manager-mode");
 
+  initShare();
+  initQR();
+  initAds();
   initManager();
 });
