@@ -620,7 +620,8 @@ function attachEvents() {
 export async function initManager() {
   attachEvents();
   await refreshLinks();
-  const alias = new URLSearchParams(location.search).get("created");
+  const createdMatch = location.pathname.match(/^\/created=([A-Za-z0-9_-]{4,32})$/);
+  const alias = createdMatch?.[1] || new URLSearchParams(location.search).get("created");
   if (alias) {
     window.history.replaceState({}, document.title, "/shortlink");
     openResultModal(getShortUrl(alias));
