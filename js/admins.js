@@ -21,8 +21,15 @@ async function api(url=API_URL, options={}) {
   return data;
 }
 
-function showLogin() { $("loginPage").classList.remove("hidden"); $("adminApp").classList.add("hidden"); }
-function showAdmin() { $("loginPage").classList.add("hidden"); $("adminApp").classList.remove("hidden"); }
+function showLogin() {
+  sessionStorage.removeItem("dimz_admin_authenticated");
+  $("loginPage").classList.remove("hidden");
+  $("adminApp").classList.add("hidden");
+}
+function showAdmin() {
+  $("loginPage").classList.add("hidden");
+  $("adminApp").classList.remove("hidden");
+}
 
 function renderMap(id, obj) {
   const entries=Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]).slice(0,8);
@@ -127,7 +134,6 @@ function openStats(link) {
 function openQr(link) {
   qrUrl=`${location.origin}/${encodeURIComponent(link.alias)}`;
   $("adminQrUrl").value=qrUrl;
-  $("adminQrLogo").value="/assets/icon/qr-create.png";
   $("adminQrCanvas").innerHTML="";
   $("qrModal").classList.remove("hidden");
 }
@@ -139,13 +145,6 @@ async function generateAdminQr() {
       await new Promise((resolve,reject)=>{src.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";src.onload=resolve;src.onerror=reject;document.head.appendChild(src);});
     }
     new window.QRCode(box,{text:qrUrl,width:240,height:240,correctLevel:window.QRCode.CorrectLevel.H});
-    setTimeout(()=>{
-      const img=box.querySelector("img,canvas");
-      if(!img)return;
-      box.classList.add("qr-overlay");
-      const logo=document.createElement("img"); logo.className="qr-logo"; logo.src=$("adminQrLogo").value||"/assets/icon/qr-create.png"; logo.alt="Logo";
-      box.appendChild(logo);
-    },120);
   } catch { toast("QR gagal dibuat."); }
 }
 
@@ -161,7 +160,13 @@ async function deleteLink(alias) {
 
 $("loginForm").addEventListener("submit",async e=>{
   e.preventDefault(); $("loginError").classList.add("hidden"); $("loginButton").disabled=true;
-  try { await api(API_URL,{method:"POST",body:JSON.stringify({action:"login",password:$("adminPassword").value})}); $("adminPassword").value=""; showAdmin(); await loadDashboard(); }
+  try {
+    await api(API_URL,{method:"POST",body:JSON.stringify({action:"login",password:$("adminPassword").value})});
+    sessionStorage.setItem("dimz_admin_authenticated","1");
+    $("adminPassword").value="";
+    showAdmin();
+    await loadDashboard();
+  }
   catch(e){$("loginError").textContent=e.message||"Login gagal.";$("loginError").classList.remove("hidden");}
   finally{$("loginButton").disabled=false;}
 });
@@ -185,7 +190,10 @@ $("editForm").addEventListener("submit",async e=>{
 });
 $("refreshButton").addEventListener("click",loadDashboard);
 $("exportButton").addEventListener("click",()=>{window.location.href=`${API_URL}?action=export`;});
-$("logoutButton").addEventListener("click",async()=>{try{await api(API_URL,{method:"POST",body:JSON.stringify({action:"logout"})});}catch{}showLogin();});
+$("logoutButton").addEventListener("click",async()=>{
+  try { await api(API_URL,{method:"POST",body:JSON.stringify({action:"logout"})}); } catch {}
+  showLogin();
+});
 $("searchInput").addEventListener("input",renderTable);
 $("statusFilter").addEventListener("change",renderTable);
 $("sortSelect").addEventListener("change",renderTable);
@@ -197,4 +205,21 @@ $("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeEd
 $("clickModal").addEventListener("click",e=>{if(e.target===$("clickModal"))$("clickModal").classList.add("hidden");});
 $("qrModal").addEventListener("click",e=>{if(e.target===$("qrModal"))$("qrModal").classList.add("hidden");});
 
-api().then(data=>{if(data.authenticated){showAdmin();loadDashboard();}else showLogin();}).catch(()=>showLogin());
+const hadAdminSession = sessionStorage.getItem("dimz_admin_authenticated") === "1";
+if (hadAdminSession) showAdmin();
+
+api().then(data=>{
+  if (data.authenticated) {
+    sessionStorage.setItem("dimz_admin_authenticated","1");
+    showAdmin();
+    // Request ini sudah membawa dashboard lengkap; hindari request kedua.
+    allLinks = Array.isArray(data.links) ? data.links : [];
+    renderStats(data.stats || {});
+    renderTable();
+  } else {
+    showLogin();
+  }
+}).catch((e)=>{
+  if (e?.status === 401) showLogin();
+  else if (!hadAdminSession) showLogin();
+});

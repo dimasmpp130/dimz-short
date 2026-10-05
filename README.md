@@ -68,8 +68,7 @@ Tidak ada recovery code, tidak ada kode key yang perlu dilihat atau disalin peng
 
 ### QR
 - Gratis untuk user.
-- QR default memakai logo `/assets/icon/qr.png` di tengah.
-- User dapat membuat PNG/SVG.
+- User dapat membuat QR dalam format PNG.
 - Admin memiliki generator QR khusus admin dan dapat memilih logo custom.
 
 ### Link Health
@@ -116,7 +115,6 @@ dimz-short-main/
 │   └── admins.js
 ├── assets/
 │   ├── icon/
-│   │   └── qr.png
 │   └── css/
 ├── js/
 │   ├── manager.js

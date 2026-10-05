@@ -97,14 +97,29 @@ function collectForm() {
 function renderLinks() {
   const container = $("#linksList");
   const search = ($("#searchLinks").value || "").trim().toLowerCase();
+  const status = $("#linkStatusFilter")?.value || "all";
+  const sort = $("#linkSort")?.value || "newest";
 
-  const filtered = allLinks.filter((link) => {
-    if (!search) return true;
-    return `${link.alias || ""} ${link.destination || ""}`.toLowerCase().includes(search);
+  let filtered = allLinks.filter((link) => {
+    const text = `${link.alias || ""} ${link.destination || ""}`.toLowerCase();
+    if (search && !text.includes(search)) return false;
+    const expired = Boolean(link.expiresAt && Date.parse(link.expiresAt) <= Date.now());
+    if (status === "expired") return expired;
+    if (status === "paused") return !expired && Boolean(link.paused);
+    if (status === "active") return !expired && !link.paused;
+    if (status === "protected") return Boolean(link.passwordProtected);
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    if (sort === "oldest") return Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0);
+    if (sort === "clicks") return Number(b.clicks || 0) - Number(a.clicks || 0);
+    if (sort === "alias") return String(a.alias || "").localeCompare(String(b.alias || ""));
+    return Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0);
   });
 
   if (!filtered.length) {
-    container.innerHTML = `<div class="empty"><i class="fa-solid fa-link-slash"></i><div>Belum ada shortlink.</div></div>`;
+    container.innerHTML = `<div class="empty"><i class="fa-solid fa-link-slash"></i><div>Tidak ada shortlink yang cocok.</div></div>`;
     return;
   }
 
@@ -145,7 +160,7 @@ function renderLinks() {
   }).join("");
 }
 
-async function refreshLinks() {
+async function refreshLinks({ silent = false } = {}) {
   try {
     const result = await listLinks();
     allLinks = Array.isArray(result.links) ? result.links : [];
@@ -154,7 +169,7 @@ async function refreshLinks() {
   } catch (error) {
     console.error(error);
     renderLinks();
-    toast(error?.data?.error || "Gagal memuat daftar link.");
+    if (!silent) toast(error?.data?.error || "Gagal memuat daftar link.");
   }
 }
 
@@ -283,6 +298,8 @@ function attachEvents() {
     e.customExpirationWrap.classList.toggle("hidden", e.expiration.value !== "custom");
   });
   $("#searchLinks").addEventListener("input", renderLinks);
+  $("#linkStatusFilter")?.addEventListener("change", renderLinks);
+  $("#linkSort")?.addEventListener("change", renderLinks);
 
   $("#linksList").addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
@@ -309,7 +326,9 @@ function attachEvents() {
 
 export async function initManager() {
   attachEvents();
-  await refreshLinks();
+  allLinks = loadLocalLinks();
+  renderLinks();
+  refreshLinks({ silent: true });
   const createdMatch = location.pathname.match(/^\/created=([A-Za-z0-9_-]{4,32})$/);
   const alias = createdMatch?.[1] || new URLSearchParams(location.search).get("created");
   if (alias) {

@@ -138,20 +138,22 @@ async function getAllLinks() {
     for (const alias of aliases) await redisCommand("SADD", "dimzlink:index", alias);
   }
 
-  const links = [];
-  for (const alias of aliases) {
+  const links = (await Promise.all(aliases.map(async (alias) => {
     try {
-      const raw = await redisCommand("GET", `dimzlink:${alias}`);
-      if (!raw) continue;
+      const [raw, clicksRaw, eventsRaw] = await Promise.all([
+        redisCommand("GET", `dimzlink:${alias}`),
+        redisCommand("GET", `dimzlink:clicks:${alias}`),
+        redisCommand("LRANGE", `dimzlink:events:${alias}`, 0, 499)
+      ]);
+      if (!raw) return null;
       const link = JSON.parse(raw);
-      link.clicks = Number(await redisCommand("GET", `dimzlink:clicks:${alias}`) || link.clicks || 0);
-      const events = await redisCommand("LRANGE", `dimzlink:events:${alias}`, 0, 499);
-      link.events = (Array.isArray(events) ? events : []).map((x) => {
+      link.clicks = Number(clicksRaw || link.clicks || 0);
+      link.events = (Array.isArray(eventsRaw) ? eventsRaw : []).map((x) => {
         try { return JSON.parse(x); } catch { return null; }
       }).filter(Boolean);
-      links.push(link);
-    } catch {}
-  }
+      return link;
+    } catch { return null; }
+  }))).filter(Boolean);
   return links;
 }
 

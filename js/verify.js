@@ -62,9 +62,8 @@ async function start() {
   title.textContent = "Pemeriksaan Keamanan";
   message.textContent = "CAPTCHA selalu digunakan saat membuat shortlink baru.";
   try {
-    const config = await getConfig();
+    const [config] = await Promise.all([getConfig(), loadRecaptcha()]);
     if (!config.recaptchaSiteKey) throw new Error("CAPTCHA belum dikonfigurasi oleh admin.");
-    await loadRecaptcha();
     window.grecaptcha.render(wrap, {
       sitekey: config.recaptchaSiteKey,
       callback: token => {

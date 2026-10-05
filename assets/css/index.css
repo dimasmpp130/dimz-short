@@ -324,8 +324,21 @@ input:focus,
   font-size: 17px;
 }
 
-.search {
-  max-width: 280px;
+.link-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.link-toolbar .search {
+  max-width: 300px;
+  flex: 1 1 240px;
+}
+
+.link-toolbar select {
+  min-width: 140px;
 }
 
 .links {
@@ -738,8 +751,19 @@ body.manager-mode .redirect-view {
     flex-direction: column;
   }
 
-  .search {
+  .link-toolbar {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .link-toolbar .search {
     max-width: none;
+    flex-basis: 100%;
+  }
+
+  .link-toolbar select {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .link-main {
