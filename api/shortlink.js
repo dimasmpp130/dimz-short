@@ -568,6 +568,19 @@ async function handleRequest(req, res) {
       return json(res, 200, { ok: true, link: publicLink(link, true) });
     }
 
+    if (action === "delete") {
+      const alias = normalizeAlias(body.alias);
+      const link = await getLink(alias);
+      if (!link) {
+        const error = new Error("Shortlink tidak ditemukan.");
+        error.status = 404;
+        throw error;
+      }
+      ensureOwner(link, workspaceId);
+      await deleteStoredLink(alias);
+      return json(res, 200, { ok: true, deleted: alias });
+    }
+
     if (action === "verify") {
       const alias = normalizeAlias(body.alias);
       const link = await getLink(alias);
