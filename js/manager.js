@@ -330,9 +330,21 @@ export async function initManager() {
   renderLinks();
   refreshLinks({ silent: true });
   const createdMatch = location.pathname.match(/^\/created=([A-Za-z0-9_-]{4,32})$/);
-  const alias = createdMatch?.[1] || new URLSearchParams(location.search).get("created");
+  let alias = createdMatch?.[1] || new URLSearchParams(location.search).get("created");
+
+  // Fallback untuk hosting/CDN yang mengubah atau membuang query string
+  // saat redirect setelah proses create.
+  if (!alias) {
+    try {
+      alias = sessionStorage.getItem("dimzlink_last_created_v1") || "";
+    } catch {}
+  }
+
   if (alias) {
-    window.history.replaceState({}, document.title, "/shortlink");
+    try {
+      sessionStorage.removeItem("dimzlink_last_created_v1");
+    } catch {}
+    window.history.replaceState({}, document.title, "/");
     openResultModal(getShortUrl(alias));
     toast("Shortlink berhasil dibuat.");
   }
