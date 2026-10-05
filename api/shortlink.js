@@ -147,6 +147,43 @@ function validUrl(value) {
   }
 }
 
+/*
+ * =========================================================
+ * BLOCKED DESTINATION DOMAINS
+ * =========================================================
+ *
+ * Domain shortener sendiri tidak boleh dijadikan
+ * destination URL.
+ *
+ * Tambahkan domain lain ke array ini jika diperlukan.
+ */
+
+const BLOCKED_HOSTS = [
+  "dimz-short.vercel.app"
+];
+
+function isBlockedUrl(value) {
+
+  try {
+
+    const url =
+      new URL(value);
+
+    const hostname =
+      url.hostname.toLowerCase();
+
+    return BLOCKED_HOSTS.some(
+      (domain) =>
+        hostname === domain ||
+        hostname.endsWith("." + domain)
+    );
+
+  } catch {
+
+    return false;
+  }
+}
+
 function validateRules(rules) {
 
   if (
@@ -875,37 +912,118 @@ async function generateUniqueAlias() {
 }
 
 async function verifyRecaptcha(token, req) {
-  if (process.env.DIMZLINK_CAPTCHA_ENABLED !== "true") return true;
-  const secret = process.env.DIMZLINK_RECAPTCHA_SECRET_KEY;
-  if (!secret) throw new Error("reCAPTCHA secret belum dikonfigurasi.");
+
+  if (
+    process.env.DIMZLINK_CAPTCHA_ENABLED !==
+    "true"
+  ) {
+    return true;
+  }
+
+  const secret =
+    process.env.DIMZLINK_RECAPTCHA_SECRET_KEY;
+
+  if (!secret) {
+
+    throw new Error(
+      "reCAPTCHA secret belum dikonfigurasi."
+    );
+  }
+
   if (!token) {
-    const error = new Error("Verifikasi keamanan diperlukan.");
+
+    const error =
+      new Error(
+        "Verifikasi keamanan diperlukan."
+      );
+
     error.status = 403;
+
     throw error;
   }
-  const form = new URLSearchParams();
-  form.set("secret", secret);
-  form.set("response", String(token));
-  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
-  if (forwarded) form.set("remoteip", forwarded);
-  const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString()
-  });
-  const result = await response.json().catch(() => null);
-  if (!response.ok || !result?.success) {
-    const error = new Error("Verifikasi reCAPTCHA gagal atau token kedaluwarsa. Silakan ulangi.");
+
+  const form =
+    new URLSearchParams();
+
+  form.set(
+    "secret",
+    secret
+  );
+
+  form.set(
+    "response",
+    String(token)
+  );
+
+  const forwarded =
+    String(
+      req.headers?.[
+        "x-forwarded-for"
+      ] || ""
+    )
+      .split(",")[0]
+      .trim();
+
+  if (forwarded) {
+
+    form.set(
+      "remoteip",
+      forwarded
+    );
+  }
+
+  const response =
+    await fetch(
+      "https://www.google.com/recaptcha/api/siteverify",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded"
+        },
+
+        body:
+          form.toString()
+      }
+    );
+
+  const result =
+    await response
+      .json()
+      .catch(
+        () => null
+      );
+
+  if (
+    !response.ok ||
+    !result?.success
+  ) {
+
+    const error =
+      new Error(
+        "Verifikasi reCAPTCHA gagal atau token kedaluwarsa. Silakan ulangi."
+      );
+
     error.status = 403;
+
     throw error;
   }
+
   return true;
 }
 
 function verificationConfig() {
+
   return {
-    verificationEnabled: process.env.DIMZLINK_CAPTCHA_ENABLED === "true",
-    recaptchaSiteKey: process.env.DIMZLINK_RECAPTCHA_SITE_KEY || ""
+
+    verificationEnabled:
+      process.env.DIMZLINK_CAPTCHA_ENABLED ===
+      "true",
+
+    recaptchaSiteKey:
+      process.env.DIMZLINK_RECAPTCHA_SITE_KEY ||
+      ""
   };
 }
 
@@ -957,6 +1075,33 @@ async function createLink(
     throw new Error(
       "Destination URL tidak valid."
     );
+  }
+
+  /*
+   * BLOKIR DOMAIN SENDIRI
+   *
+   * Ini memastikan user tidak dapat membuat
+   * shortlink yang mengarah ke:
+   *
+   * https://dimz-short.vercel.app
+   * https://dimz-short.vercel.app/test
+   * dan path lainnya.
+   */
+
+  if (
+    isBlockedUrl(
+      input.destination
+    )
+  ) {
+
+    const error =
+      new Error(
+        "URL tersebut tidak dapat digunakan sebagai tujuan shortlink."
+      );
+
+    error.status = 400;
+
+    throw error;
   }
 
   const expiresAt =
@@ -1114,6 +1259,31 @@ async function updateExistingLink(
     );
   }
 
+  /*
+   * BLOKIR DOMAIN SENDIRI SAAT UPDATE
+   *
+   * Supaya shortlink lama juga tidak bisa
+   * diedit menjadi:
+   *
+   * https://dimz-short.vercel.app/...
+   */
+
+  if (
+    isBlockedUrl(
+      input.destination
+    )
+  ) {
+
+    const error =
+      new Error(
+        "URL tersebut tidak dapat digunakan sebagai tujuan shortlink."
+      );
+
+    error.status = 400;
+
+    throw error;
+  }
+
   const expiresAt =
     input.expiresAt
       ? new Date(
@@ -1162,27 +1332,60 @@ async function updateExistingLink(
   link.expiresAt =
     expiresAt;
 
-  if (Object.prototype.hasOwnProperty.call(input, "mobileUrl")) {
-    link.mobileUrl = input.mobileUrl || null;
+  if (
+    Object.prototype.hasOwnProperty.call(
+      input,
+      "mobileUrl"
+    )
+  ) {
+
+    link.mobileUrl =
+      input.mobileUrl || null;
   }
 
-  if (Object.prototype.hasOwnProperty.call(input, "desktopUrl")) {
-    link.desktopUrl = input.desktopUrl || null;
+  if (
+    Object.prototype.hasOwnProperty.call(
+      input,
+      "desktopUrl"
+    )
+  ) {
+
+    link.desktopUrl =
+      input.desktopUrl || null;
   }
 
-  if (Object.prototype.hasOwnProperty.call(input, "countryRules")) {
-    link.countryRules = validateRules(input.countryRules || {});
+  if (
+    Object.prototype.hasOwnProperty.call(
+      input,
+      "countryRules"
+    )
+  ) {
+
+    link.countryRules =
+      validateRules(
+        input.countryRules || {}
+      );
   }
 
-  if (Object.prototype.hasOwnProperty.call(input, "languageRules")) {
-    link.languageRules = validateRules(input.languageRules || {});
+  if (
+    Object.prototype.hasOwnProperty.call(
+      input,
+      "languageRules"
+    )
+  ) {
+
+    link.languageRules =
+      validateRules(
+        input.languageRules || {}
+      );
   }
 
   if (
     input.removePassword === true
   ) {
 
-    link.passwordHash = null;
+    link.passwordHash =
+      null;
 
   } else if (
     input.password &&
@@ -1246,10 +1449,24 @@ async function handleRequest(
       const query =
         req.query || {};
 
-      const action = String(query.action || "");
+      const action =
+        String(
+          query.action || ""
+        );
 
-      if (action === "config") {
-        json(res, 200, { ok: true, ...verificationConfig() });
+      if (
+        action === "config"
+      ) {
+
+        json(
+          res,
+          200,
+          {
+            ok: true,
+            ...verificationConfig()
+          }
+        );
+
         return;
       }
 
@@ -1411,9 +1628,19 @@ async function handleRequest(
         body.action || ""
       );
 
-    if (action === "create") {
-      await verifyRecaptcha(body.recaptchaToken, req);
-      const link = await createLink(body);
+    if (
+      action === "create"
+    ) {
+
+      await verifyRecaptcha(
+        body.recaptchaToken,
+        req
+      );
+
+      const link =
+        await createLink(
+          body
+        );
 
       json(
         res,
@@ -1664,7 +1891,10 @@ async function handleRequest(
         return;
       }
 
-      await verifyRecaptcha(body.recaptchaToken, req);
+      await verifyRecaptcha(
+        body.recaptchaToken,
+        req
+      );
 
       if (link.passwordHash) {
 
