@@ -70,7 +70,7 @@ The API prevents users from creating or updating a shortlink that points back to
 Currently blocked:
 
 ```text
-dimz-short.vercel.app
+info.dimz-wtf.web.id
 ```
 
 For example:
