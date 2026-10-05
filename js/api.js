@@ -25,6 +25,14 @@ export async function setLinkState(alias, paused) {
   });
 }
 
+export async function deleteLink(alias) {
+  return apiFetch(CONFIG.API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "delete", alias })
+  });
+}
+
 export async function listLinks() {
   return apiFetch(`${CONFIG.API_URL}?action=list`);
 }
