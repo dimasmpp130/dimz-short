@@ -1,8 +1,8 @@
 export const CONFIG = Object.freeze({
   API_URL: "/api/shortlink",
   CACHE_KEY: "dimzlink_final_links_v1",
-  OWNER_KEY: "dimzlink_owner_key_v2",
-  COUNTDOWN_SECONDS: 5, // Ubah angka ini untuk mengatur timer landing page (detik)
+  OWNER_KEY: "dimzlink_owner_key_v1",
+  COUNTDOWN_SECONDS: 10, 
   ALIAS_MIN: 4,
   ALIAS_MAX: 32,
   QR_CDN: "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js",
