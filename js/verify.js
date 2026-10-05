@@ -47,13 +47,8 @@ async function createAfterVerification() {
     });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "Gagal membuat shortlink.");
-    // Simpan hasil sebagai fallback jika hosting melakukan redirect/rewrite.
-    sessionStorage.setItem("dimzlink_last_created_v1", JSON.stringify(data.link));
     sessionStorage.removeItem(STORAGE_KEY);
-
-    // Root (/) adalah halaman manager. Jangan lewat /shortlink karena
-    // route lama dapat me-redirect dan membuang query ?created=...
-    location.replace(`/?created=${encodeURIComponent(data.link.alias)}`);
+    location.replace(`/shortlink?created=${encodeURIComponent(data.link.alias)}`);
   } catch (error) {
     submitted = false;
     spinner.classList.remove("show");
@@ -76,10 +71,7 @@ async function start() {
         createButton.disabled = false;
         createButton.style.opacity = "1";
         createButton.style.cursor = "pointer";
-        setStatus("Verifikasi berhasil. Membuat shortlink...", "success");
-        // Setelah CAPTCHA sukses, langsung buat link agar tidak ada langkah
-        // tambahan yang membuat user mengira proses macet.
-        createAfterVerification();
+        setStatus("Verifikasi berhasil. Tekan Buat Link.", "success");
       },
       "expired-callback": () => {
         recaptchaToken = ""; createButton.disabled = true;
