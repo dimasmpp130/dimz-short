@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#07080c">
+  <title>DIMZ/SHORT · Admin</title>
+  <link rel="stylesheet" href="/assets/css/admins.css">
+</head>
+<body>
+<section id="loginPage" class="login-page">
+  <div class="login-card">
+    <div class="logo">D</div>
+    <h1>DIMZ/SHORT</h1>
+    <p>Panel admin untuk memantau link, keamanan, dan analytics.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="adminPassword">Password Admin</label>
+        <input id="adminPassword" class="input" type="password" autocomplete="current-password" placeholder="Masukkan password admin" required>
+      </div>
+      <button id="loginButton" class="btn btn-primary" type="submit">Masuk Admin</button>
+    </form>
+    <div id="loginError" class="login-error hidden"></div>
+  </div>
+</section>
+
+<main id="adminApp" class="app hidden">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><div class="brand-icon">D</div><div><div class="brand-title">DIMZ/SHORT</div><div class="brand-sub">Admin Analytics</div></div></div>
+      <div class="top-actions">
+        <button id="refreshButton" class="btn btn-secondary" type="button">Refresh</button>
+        <button id="exportButton" class="btn btn-secondary" type="button">Export CSV</button>
+        <button id="logoutButton" class="btn btn-secondary" type="button">Keluar</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <section class="heading">
+      <div><h1>Dashboard</h1><p>Pantau shortlink dan perilaku klik tanpa fitur Advanced Redirect/Management.</p></div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><div class="stat-label">TOTAL SHORTLINK</div><div id="totalLinks" class="stat-value">0</div></div>
+      <div class="stat"><div class="stat-label">TOTAL KLIK</div><div id="totalClicks" class="stat-value">0</div></div>
+      <div class="stat"><div class="stat-label">PENGUNJUNG UNIK</div><div id="uniqueVisitors" class="stat-value">0</div></div>
+      <div class="stat"><div class="stat-label">MANUSIA / BOT</div><div id="humanBot" class="stat-value">0 / 0</div></div>
+    </section>
+
+    <section class="analytics-grid">
+      <div class="analytics-card"><strong>Negara</strong><div id="countryStats" class="stat-list"></div></div>
+      <div class="analytics-card"><strong>Perangkat</strong><div id="deviceStats" class="stat-list"></div></div>
+      <div class="analytics-card"><strong>Browser</strong><div id="browserStats" class="stat-list"></div></div>
+      <div class="analytics-card"><strong>Bahasa</strong><div id="languageStats" class="stat-list"></div></div>
+    </section>
+
+    <section class="toolbar">
+      <input id="searchInput" class="input search" type="search" placeholder="Cari alias atau URL tujuan..." autocomplete="off">
+      <select id="statusFilter" class="input"><option value="all">Semua status</option><option value="active">Aktif</option><option value="paused">Dijeda</option><option value="expired">Kedaluwarsa</option><option value="protected">Berpassword</option></select>
+      <select id="sortSelect" class="input"><option value="newest">Terbaru</option><option value="oldest">Terlama</option><option value="clicks">Klik terbanyak</option><option value="alias">Alias A–Z</option></select>
+    </section>
+
+    <section class="table-card">
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Alias</th><th>Tujuan</th><th>Klik</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+          <tbody id="linksBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="editModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-head"><h2>Edit Shortlink</h2><button id="closeEdit" class="close" type="button">×</button></div>
+    <form id="editForm">
+      <input id="editAlias" type="hidden">
+      <div class="field"><label>Alias</label><input id="editAliasDisplay" class="input" type="text" disabled></div>
+      <div class="field"><label>URL Tujuan</label><input id="editDestination" class="input" type="url" required></div>
+      <div class="grid-2">
+        <div class="field"><label>Password baru (opsional)</label><input id="editPassword" class="input" type="password" autocomplete="new-password"></div>
+        <div class="field"><label>Kedaluwarsa</label><input id="editExpiresAt" class="input" type="datetime-local"></div>
+      </div>
+      <label class="inline-check"><input id="removePassword" type="checkbox"> Hapus password</label>
+      <div class="modal-actions"><button id="cancelEdit" class="btn btn-secondary" type="button">Batal</button><button class="btn btn-primary" type="submit">Simpan</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="clickModal" class="modal-backdrop hidden">
+  <div class="modal modal-wide">
+    <div class="modal-head"><div><h2>Analytics Shortlink</h2><p id="clickSummary" class="modal-sub"></p></div><button id="closeClicks" class="close" type="button">×</button></div>
+    <div class="analytics-grid compact">
+      <div class="analytics-card"><strong>Jam</strong><div id="hourStats" class="stat-list"></div></div>
+      <div class="analytics-card"><strong>OS</strong><div id="osStats" class="stat-list"></div></div>
+      <div class="analytics-card"><strong>Referrer</strong><div id="referrerStats" class="stat-list"></div></div>
+    </div>
+    <div id="clickDetails" class="click-list"></div>
+  </div>
+</div>
+
+<div id="qrModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-head"><h2>QR Admin</h2><button id="closeQr" class="close" type="button">×</button></div>
+    <p class="modal-sub">QR default menggunakan logo <code>/assets/icon/qr-create.png</code>. Admin dapat memilih logo lain.</p>
+    <input id="adminQrUrl" class="input" readonly>
+    <div class="field"><label>Logo custom (opsional)</label><input id="adminQrLogo" class="input" type="url" placeholder="/assets/icon/qr-create.png"></div>
+    <div id="adminQrCanvas" class="qr-admin"></div>
+    <div class="modal-actions"><button id="adminGenerateQr" class="btn btn-primary" type="button">Buat QR</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/js/i18n.js"></script>
+<script src="/js/admins.js" defer></script>
+</body>
+</html>
