@@ -2,7 +2,8 @@ import {
   createLink,
   updateLink,
   listLinks,
-  setLinkState
+  setLinkState,
+  deleteLink
 } from "./api.js";
 
 import {
@@ -155,6 +156,7 @@ function renderLinks() {
           <button class="mini-btn" data-action="toggle" data-alias="${escapeHtml(link.alias)}">${paused ? '<i class="fa-solid fa-play"></i> Resume' : '<i class="fa-solid fa-pause"></i> Pause'}</button>
           <button class="mini-btn" data-action="qr" data-alias="${escapeHtml(link.alias)}"><i class="fa-solid fa-qrcode"></i> QR</button>
           <button class="mini-btn" data-action="edit" data-alias="${escapeHtml(link.alias)}"><i class="fa-solid fa-pen"></i> Edit</button>
+          <button class="mini-btn danger" data-action="delete" data-alias="${escapeHtml(link.alias)}"><i class="fa-solid fa-trash"></i> Hapus</button>
         </div>
       </article>
     `;
@@ -291,6 +293,28 @@ function openQR(alias) {
   setQRUrl(shortUrl);
 }
 
+async function removeLink(alias) {
+  const link = allLinks.find((item) => item.alias === alias);
+  if (!link) return;
+
+  const shortUrl = getShortUrl(alias);
+  const confirmed = window.confirm(
+    `Hapus shortlink ini?\\n\\n${shortUrl}\\n\\nData link, klik, dan analytics akan ikut dihapus dan tidak dapat dipulihkan.`
+  );
+  if (!confirmed) return;
+
+  try {
+    await deleteLink(alias);
+    allLinks = allLinks.filter((item) => item.alias !== alias);
+    saveLocalLinks(allLinks);
+    renderLinks();
+    toast("Shortlink berhasil dihapus.");
+  } catch (error) {
+    console.error(error);
+    toast(error?.data?.error || error?.message || "Gagal menghapus shortlink.");
+  }
+}
+
 function attachEvents() {
   const e = getFormElements();
   e.form.addEventListener("submit", handleSubmit);
@@ -313,6 +337,7 @@ function attachEvents() {
     if (action === "toggle") toggleLink(alias);
     if (action === "qr") openQR(alias);
     if (action === "edit") startEdit(alias);
+    if (action === "delete") removeLink(alias);
   });
 
   $("#closeResult").addEventListener("click", () => $("#resultModal").classList.remove("show"));
