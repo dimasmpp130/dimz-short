@@ -432,14 +432,23 @@ input:focus,
   padding: 0 0 30px;
 }
 
+html.redirect-route .manager-view,
+html.redirect-route .manager-ad,
+html.redirect-route .manager-footer,
 body.redirect-mode .manager-view,
-    body.redirect-mode .manager-ad,
-    body.redirect-mode .manager-footer {
-  display: none!important;
+body.redirect-mode .manager-ad,
+body.redirect-mode .manager-footer {
+  display: none !important;
 }
 
+html.redirect-route .redirect-view,
+body.redirect-mode .redirect-view {
+  display: flex !important;
+}
+
+html.manager-route .redirect-view,
 body.manager-mode .redirect-view {
-  display: none!important;
+  display: none !important;
 }
 
 .redirect-view {
@@ -505,6 +514,60 @@ body.manager-mode .redirect-view {
   justify-content: center;
   min-height: 65px;
   margin: 18px 0;
+}
+
+.redirect-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.redirect-brand-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 8px 22px rgba(17,24,39,.12);
+}
+
+.redirect-brand strong,
+.redirect-brand span {
+  display: block;
+}
+
+.redirect-brand strong {
+  font-size: 14px;
+  letter-spacing: -.2px;
+}
+
+.redirect-brand span {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.countdown-label {
+  margin: 14px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.countdown-label strong {
+  color: var(--text);
+}
+
+.countdown {
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  margin: 4px 0 18px;
 }
 
 .password-panel {
