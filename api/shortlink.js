@@ -552,12 +552,8 @@ async function handleRequest(req, res) {
     const workspaceId = ensureWorkspace(req, res);
 
     if (action === "create") {
-      // Rate-limit dan verifikasi CAPTCHA tidak saling bergantung, jadi jalankan
-      // secara paralel untuk mengurangi waktu tunggu sebelum create.
-      await Promise.all([
-        rateLimit(req, "create"),
-        verifyRecaptcha(body.recaptchaToken, req)
-      ]);
+      await rateLimit(req, "create");
+      await verifyRecaptcha(body.recaptchaToken, req);
       const link = await createLink(body, req, workspaceId);
       return json(res, 201, { ok: true, link: publicLink(link) });
     }
