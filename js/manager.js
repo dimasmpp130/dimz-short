@@ -358,7 +358,7 @@ export async function initManager() {
       renderLinks();
       alias = createdLink.alias;
     }
-    window.history.replaceState({}, document.title, "/");
+    window.history.replaceState({}, document.title, "/shortlink");
     openResultModal(getShortUrl(alias), createdLink?.destination || "");
     toast("Shortlink berhasil dibuat.");
   }
