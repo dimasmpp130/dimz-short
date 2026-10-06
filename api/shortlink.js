@@ -11,7 +11,8 @@ const BLOCKED_HOSTS = [
 
 const RATE = {
   create: { limit: 20, window: 60 * 60 },
-  track: { limit: 240, window: 60 * 60 }
+  track: { limit: 240, window: 60 * 60 },
+  verify: { limit: 30, window: 15 * 60 }
 };
 
 function json(res, status, data, extraHeaders = {}) {
@@ -282,7 +283,8 @@ function isExpired(link) {
 function buildClickData(req) {
   const ua = String(req.headers?.["user-agent"] || "");
   const ip = getClientIp(req);
-  const secret = process.env.DIMZLINK_IP_SECRET || "change-this-secret";
+  const secret = process.env.DIMZLINK_IP_SECRET;
+  if (!secret) throw new Error("DIMZLINK_IP_SECRET belum dikonfigurasi.");
   return {
     time: new Date().toISOString(),
     visitor: sha256(`${ip}.${secret}`),
@@ -582,6 +584,7 @@ async function handleRequest(req, res) {
     }
 
     if (action === "verify") {
+      await rateLimit(req, "verify");
       const alias = normalizeAlias(body.alias);
       const link = await getLink(alias);
       if (!link) return json(res, 404, { ok: false, error: "Shortlink tidak ditemukan." });
