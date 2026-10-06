@@ -180,41 +180,155 @@ function openQr(link) {
 
 async function loadQrScript(){
   if(window.QRCode)return;
-  await new Promise((resolve,reject)=>{const src=document.createElement("script");src.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";src.onload=resolve;src.onerror=reject;document.head.appendChild(src);});
+  await new Promise((resolve,reject)=>{
+    const src=document.createElement("script");
+    src.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    src.onload=resolve;
+    src.onerror=reject;
+    document.head.appendChild(src);
+  });
 }
-function qrLogoSize(){return localStorage.getItem("dimz_qr_logo_size") === "medium" ? 44 : 32;}
-async function generateAdminQr() {
-  const box=$("adminQrCanvas"); box.innerHTML="";
-  try {
-    await loadQrScript();
-    const size=Number(localStorage.getItem("dimz_qr_size")||240);
-    new window.QRCode(box,{text:qrUrl,width:size,height:size,correctLevel:window.QRCode.CorrectLevel.H});
-    setTimeout(()=>{
-      const img=box.querySelector("img,canvas"); if(!img)return;
-      box.classList.add("qr-overlay");
-      const logoSrc=getAdminQrLogo(); if(!logoSrc)return;
-      const logo=document.createElement("img"); logo.className="qr-logo"; logo.style.width=qrLogoSize()+"px"; logo.style.height=qrLogoSize()+"px"; logo.src=logoSrc; logo.alt="Logo QR"; logo.onerror=()=>logo.remove(); box.appendChild(logo);
-      if(adminQrSourceMode==="gallery"&&logoSrc.startsWith("blob:")){logo.addEventListener("load",()=>URL.revokeObjectURL(logoSrc),{once:true});logo.addEventListener("error",()=>URL.revokeObjectURL(logoSrc),{once:true});}
-    },120);
-  } catch(error){console.error(error);toast("QR gagal dibuat.");}
+
+function qrLogoSize(){
+  return localStorage.getItem("dimz_qr_logo_size") === "medium" ? 44 : 32;
 }
-async function getAdminQrCanvas(){
-  const source=$("adminQrCanvas")?.querySelector("canvas, img:not(.qr-logo)"); if(!source)return null;
-  const qr=document.createElement("canvas"); qr.width=qr.height=600; const qctx=qr.getContext("2d");
-  if(source.tagName.toLowerCase()==="canvas") qctx.drawImage(source,0,0,600,600);
-  else { const image=new Image(); image.crossOrigin="anonymous"; await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=source.src;}); qctx.drawImage(image,0,0,600,600); }
-  const logo=$("adminQrCanvas .qr-logo"); const canvas=document.createElement("canvas"); const size=720; canvas.width=canvas.height=size; const ctx=canvas.getContext("2d"); ctx.fillStyle="#fff";ctx.fillRect(0,0,size,size);
-  ctx.drawImage(qr,60,60,600,600);
-  if(logo?.complete&&logo.naturalWidth){const ls=qrLogoSize()*2.5;const pad=Math.round(ls*.16);ctx.fillStyle="#fff";ctx.beginPath();ctx.roundRect((size-ls)/2-pad,(size-ls)/2-pad,ls+pad*2,ls+pad*2,Math.round(ls*.18));ctx.fill();ctx.drawImage(logo,(size-ls)/2,(size-ls)/2,ls,ls);}
+
+function loadAdminQrImage(src){
+  return new Promise((resolve,reject)=>{
+    if(!src) return reject(new Error("Logo QR tidak tersedia."));
+    const image=new Image();
+    if(!String(src).startsWith("blob:") && !String(src).startsWith(location.origin)){
+      image.crossOrigin="anonymous";
+    }
+    image.onload=()=>resolve(image);
+    image.onerror=()=>reject(new Error("Logo QR gagal dimuat."));
+    image.src=src;
+  });
+}
+
+function drawAdminQrLogo(ctx, logo, center, qrSize){
+  const logoSize=Math.round(qrSize * (localStorage.getItem("dimz_qr_logo_size") === "medium" ? 0.20 : 0.15));
+  const padding=Math.max(6, Math.round(logoSize * 0.16));
+  const boxSize=logoSize + padding * 2;
+  const x=center - boxSize / 2;
+  const y=center - boxSize / 2;
+  const radius=Math.max(8, Math.round(boxSize * 0.16));
+
+  ctx.save();
+  ctx.fillStyle="#fff";
+  ctx.beginPath();
+  ctx.roundRect(x,y,boxSize,boxSize,radius);
+  ctx.fill();
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  ctx.drawImage(logo,center-logoSize/2,center-logoSize/2,logoSize,logoSize);
+  ctx.restore();
+}
+
+async function makeAdminQrCanvas(source, logoSrc, outputSize=720){
+  const sourceCanvas=document.createElement("canvas");
+  sourceCanvas.width=sourceCanvas.height=600;
+  const sourceCtx=sourceCanvas.getContext("2d",{alpha:false});
+  sourceCtx.fillStyle="#fff";
+  sourceCtx.fillRect(0,0,600,600);
+  sourceCtx.imageSmoothingEnabled=false;
+
+  if(source.tagName.toLowerCase()==="canvas"){
+    sourceCtx.drawImage(source,0,0,600,600);
+  }else{
+    const image=await loadAdminQrImage(source.src);
+    sourceCtx.drawImage(image,0,0,600,600);
+  }
+
+  const canvas=document.createElement("canvas");
+  canvas.width=canvas.height=outputSize;
+  const ctx=canvas.getContext("2d",{alpha:false});
+  ctx.fillStyle="#fff";
+  ctx.fillRect(0,0,outputSize,outputSize);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  ctx.drawImage(sourceCanvas,60,60,600,600);
+
+  try{
+    const logo=await loadAdminQrImage(logoSrc);
+    drawAdminQrLogo(ctx,logo,outputSize/2,600);
+  }catch(error){
+    console.warn("Logo QR tidak dapat disematkan:",error);
+  }
+
   return canvas;
 }
+
+let adminGeneratedQrCanvas=null;
+
+async function generateAdminQr(){
+  const box=$("adminQrCanvas");
+  box.innerHTML="";
+  adminGeneratedQrCanvas=null;
+
+  try{
+    await loadQrScript();
+    const size=Number(localStorage.getItem("dimz_qr_size")||240);
+    new window.QRCode(box,{
+      text:qrUrl,
+      width:size,
+      height:size,
+      correctLevel:window.QRCode.CorrectLevel.H
+    });
+
+    await new Promise(resolve=>setTimeout(resolve,120));
+    const source=box.querySelector("canvas, img");
+    if(!source) throw new Error("QR tidak berhasil dibuat.");
+
+    const logoSrc=getAdminQrLogo();
+    adminGeneratedQrCanvas=await makeAdminQrCanvas(source,logoSrc,720);
+
+    const preview=document.createElement("canvas");
+    preview.width=preview.height=600;
+    const previewCtx=preview.getContext("2d");
+    previewCtx.drawImage(adminGeneratedQrCanvas,60,60,600,600,0,0,600,600);
+    preview.className="qr-render";
+    preview.setAttribute("role","img");
+    preview.setAttribute("aria-label","QR Code shortlink dengan logo");
+
+    box.innerHTML="";
+    box.classList.add("qr-overlay");
+    box.appendChild(preview);
+  }catch(error){
+    console.error(error);
+    toast("QR gagal dibuat.");
+  }
+}
+
+async function getAdminQrCanvas(){
+  if(adminGeneratedQrCanvas) return adminGeneratedQrCanvas;
+  const source=$("adminQrCanvas")?.querySelector("canvas, img");
+  if(!source) return null;
+  return makeAdminQrCanvas(source,getAdminQrLogo(),720);
+}
+
 async function downloadAdminQr(format){
-  const canvas=await getAdminQrCanvas(); if(!canvas)return toast("Buat QR terlebih dahulu.");
+  const canvas=await getAdminQrCanvas();
+  if(!canvas) return toast("Buat QR terlebih dahulu.");
+
   const name=`dimz-${(qrUrl.split("/").pop()||"shortlink").replace(/[^A-Za-z0-9_-]/g,"-").slice(0,40)}`;
-  if(format==="png"){const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download=`${name}.png`;a.click();return;}
+
+  if(format==="png"){
+    const a=document.createElement("a");
+    a.href=canvas.toDataURL("image/png");
+    a.download=`${name}.png`;
+    a.click();
+    return;
+  }
+
   const data=canvas.toDataURL("image/png").replaceAll("&","&amp;").replaceAll('"','&quot;');
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720"><rect width="720" height="720" fill="#fff"/><image href="${data}" width="720" height="720"/></svg>`;
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));a.download=`${name}.svg`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720"><rect width="720" height="720" fill="#fff"/><image href="${data}" x="0" y="0" width="720" height="720" preserveAspectRatio="none"/></svg>`;
+  const blobUrl=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
+  const a=document.createElement("a");
+  a.href=blobUrl;
+  a.download=`${name}.svg`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(blobUrl),1000);
 }
 
 async function changeState(alias, paused) {
@@ -321,7 +435,6 @@ api().then(data=>{
   if (data.authenticated) {
     sessionStorage.setItem("dimz_admin_authenticated","1");
     showAdmin();
-    // Request ini sudah membawa dashboard lengkap; hindari request kedua.
     allLinks = Array.isArray(data.links) ? data.links : [];
     renderStats(data.stats || {});
     renderTable();
