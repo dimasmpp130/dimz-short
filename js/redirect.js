@@ -21,6 +21,7 @@ function showError(title, message) {
   $("#recaptchaWrap")?.classList.add("hidden");
   $("#continueBtn")?.classList.add("hidden");
   $("#passwordPanel")?.classList.add("hidden");
+  $("#homeBtn")?.classList.remove("hidden");
   setStatus(message, "error");
 }
 
