@@ -262,14 +262,39 @@ button {
 }
 
 .toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(175px, 0.22fr) minmax(175px, 0.22fr);
   gap: 10px;
   margin-bottom: 15px;
+  width: 100%;
 }
 
-.search {
-  flex: 1;
+.toolbar .search {
+  width: 100%;
   min-width: 0;
+}
+
+.toolbar select.input {
+  width: 100%;
+  min-width: 0;
+  appearance: auto;
+  -webkit-appearance: auto;
+  color-scheme: dark;
+  background-color: #11131a;
+  color: #f5f7fb;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f5f7fb;
+}
+
+.toolbar select.input option {
+  background: #11131a;
+  color: #f5f7fb;
+}
+
+.toolbar select.input:focus {
+  background-color: #151821;
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
 }
 
 .table-card {
@@ -523,7 +548,12 @@ tbody tr:hover {
   }
 
   .toolbar {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar .search,
+  .toolbar select.input {
+    width: 100%;
   }
 
   .grid-2 {
