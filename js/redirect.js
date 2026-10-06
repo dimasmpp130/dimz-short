@@ -6,8 +6,6 @@ let currentAlias = "";
 let currentToken = "";
 let recaptchaToken = "";
 let protectedLink = false;
-let recaptchaWidgetId = null;
-let captchaRenderTimer = null;
 let countdownTimer = null;
 
 function setStatus(message, type = "") {
@@ -27,75 +25,14 @@ function showError(title, message) {
 }
 
 function loadRecaptcha() {
-  if (window.grecaptcha?.render) {
-    return Promise.resolve(window.grecaptcha);
-  }
-
-  if (window.__dimzRecaptchaPromise) {
-    return window.__dimzRecaptchaPromise;
-  }
-
-  window.__dimzRecaptchaPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error(
-        "CAPTCHA tidak merespons. Periksa koneksi, pemblokir iklan, atau DNS lalu coba lagi."
-      ));
-    }, 15000);
-
-    const finish = () => {
-      clearTimeout(timeout);
-
-      if (window.grecaptcha?.render) {
-        resolve(window.grecaptcha);
-      } else {
-        reject(new Error("CAPTCHA selesai dimuat tetapi tidak siap."));
-      }
-    };
-
-    const existing = document.querySelector(
-      'script[src^="https://www.google.com/recaptcha/api.js"]'
-    );
-
-    if (existing) {
-      existing.addEventListener("load", finish, { once: true });
-      existing.addEventListener(
-        "error",
-        () => {
-          clearTimeout(timeout);
-          reject(new Error("CAPTCHA diblokir atau gagal dimuat."));
-        },
-        { once: true }
-      );
-
-      // Script may have finished before this listener was attached.
-      if (window.grecaptcha?.render) finish();
-      return;
-    }
-
+  return new Promise((resolve, reject) => {
+    if (window.grecaptcha?.render) return resolve();
+    window.onRecaptchaLoaded = resolve;
     const script = document.createElement("script");
-    script.src =
-      "https://www.google.com/recaptcha/api.js?render=explicit";
-    script.async = true;
-    script.defer = true;
-
-    script.addEventListener("load", finish, { once: true });
-    script.addEventListener(
-      "error",
-      () => {
-        clearTimeout(timeout);
-        reject(new Error(
-          "CAPTCHA diblokir atau gagal dimuat. Coba nonaktifkan ad-blocker untuk situs ini lalu ulangi."
-        ));
-      },
-      { once: true }
-    );
-
+    script.src = "https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoaded&render=explicit";
+    script.async = true; script.defer = true; script.onerror = reject;
     document.head.appendChild(script);
-  }).finally(() => {
-    window.__dimzRecaptchaPromise = null;
   });
-
-  return window.__dimzRecaptchaPromise;
 }
 
 async function getConfig() {
@@ -106,56 +43,22 @@ async function getConfig() {
 }
 
 async function startCountdown() {
-  clearTimeout(countdownTimer);
-
-  const seconds = Math.max(
-    0,
-    Math.floor(Number(CONFIG.COUNTDOWN_SECONDS) || 0)
-  );
-
+  clearInterval(countdownTimer);
+  const seconds = Math.max(0, Math.floor(Number(CONFIG.COUNTDOWN_SECONDS) || 0));
   const countdown = $("#countdown");
   const label = $("#countdownLabel");
-
-  if (!countdown || !label) return;
-
-  if (seconds <= 0) {
-    label.classList.add("hidden");
-    countdown.classList.add("hidden");
-    return;
-  }
-
-  label.classList.remove("hidden");
-  countdown.classList.remove("hidden");
-
-  // Always synchronize the visible label with config.
-  // This removes the old hard-coded "5 detik" flash.
-  const updateLabel = value => {
-    countdown.textContent = String(value);
-    label.innerHTML = `Tunggu <strong><span id="countdown">${value}</span> detik</strong>`;
-  };
-
+  if (seconds <= 0) { label?.classList.add("hidden"); return; }
+  label?.classList.remove("hidden"); countdown?.classList.remove("hidden");
   let remaining = seconds;
-
   await new Promise(resolve => {
     const tick = () => {
-      if (remaining <= 0) {
-        clearTimeout(countdownTimer);
-        label.classList.add("hidden");
-        countdown.classList.add("hidden");
-        resolve();
-        return;
-      }
-
-      // Re-acquire the span because updateLabel replaces its contents.
-      label.innerHTML =
-        `Tunggu <strong><span id="countdown">${remaining}</span> detik</strong>`;
-
-      remaining -= 1;
-      countdownTimer = setTimeout(tick, 1000);
+      if (countdown) countdown.textContent = String(remaining);
+      if (remaining <= 0) { clearTimeout(countdownTimer); resolve(); return; }
+      remaining--; countdownTimer = setTimeout(tick, 1000);
     };
-
     tick();
   });
+  label?.classList.add("hidden"); countdown?.classList.add("hidden");
 }
 
 function canContinue() {
@@ -168,87 +71,38 @@ function updateContinueState() {
   if (button) button.disabled = !canContinue();
 }
 
-
-function showCaptchaRetry() {
-  const status = $("redirectStatus");
-  if (!status) return;
-  let retry = $("captchaRetry");
-  if (!retry) {
-    retry = document.createElement("button");
-    retry.id = "captchaRetry";
-    retry.type = "button";
-    retry.textContent = "Muat Ulang CAPTCHA";
-    retry.className = "captcha-retry";
-    status.insertAdjacentElement("afterend", retry);
-    retry.addEventListener("click", async () => {
-      retry.disabled = true;
-      retry.textContent = "Memuat CAPTCHA...";
-      recaptchaToken = "";
-      captchaRenderTimer && clearTimeout(captchaRenderTimer);
-      recaptchaWidgetId = null;
-      await renderCaptcha(true);
-    });
-  }
-  retry.disabled = false;
-}
-
-function removeCaptchaRetry() { $("captchaRetry")?.remove(); }
-function captchaLooksRendered(wrap) {
-  return Boolean(wrap?.querySelector("iframe, textarea[name='g-recaptcha-response'], .g-recaptcha-response"));
-}
-
-async function renderCaptcha(force = false) {
-  const wrap = $("recaptchaWrap");
-  const button = $("continueBtn");
+async function renderCaptcha() {
+  const wrap = $("#recaptchaWrap");
+  const button = $("#continueBtn");
   if (!wrap || !button) return;
 
-  clearTimeout(captchaRenderTimer);
   wrap.classList.remove("hidden");
   button.classList.remove("hidden");
   button.disabled = true;
-  setStatus("Memuat CAPTCHA...");
+  setStatus("Silakan selesaikan CAPTCHA untuk melanjutkan.");
 
   try {
     const config = await getConfig();
     if (!config.recaptchaSiteKey) throw new Error("CAPTCHA belum dikonfigurasi. Hubungi admin.");
-
-    const recaptcha = await loadRecaptcha();
-    if (!force && recaptchaWidgetId !== null && captchaLooksRendered(wrap)) return;
-
-    recaptchaToken = "";
-    removeCaptchaRetry();
-    wrap.innerHTML = "";
-    recaptchaWidgetId = recaptcha.render(wrap, {
+    await loadRecaptcha();
+    window.grecaptcha.render(wrap, {
       sitekey: config.recaptchaSiteKey,
-      theme: "light",
       callback: token => {
         recaptchaToken = token;
         updateContinueState();
         setStatus(protectedLink ? "CAPTCHA berhasil. Masukkan password jika diperlukan, lalu lanjutkan." : "CAPTCHA berhasil. Link siap diarahkan.", "success");
       },
       "expired-callback": () => {
-        recaptchaToken = "";
-        updateContinueState();
-        setStatus("CAPTCHA kedaluwarsa. Silakan verifikasi lagi.", "error");
+        recaptchaToken = ""; updateContinueState();
+        setStatus("CAPTCHA kedaluwarsa. Silakan ulangi.", "error");
       },
       "error-callback": () => {
-        recaptchaToken = "";
-        updateContinueState();
-        setStatus("CAPTCHA gagal dimuat. Tekan Muat Ulang CAPTCHA jika kotaknya tidak muncul.", "error");
-        showCaptchaRetry();
+        recaptchaToken = ""; updateContinueState();
+        setStatus("CAPTCHA gagal dimuat. Silakan refresh halaman.", "error");
       }
     });
-
-    captchaRenderTimer = setTimeout(() => {
-      if (!captchaLooksRendered(wrap) && !recaptchaToken) {
-        setStatus("CAPTCHA belum muncul. Tekan Muat Ulang CAPTCHA untuk mencoba lagi.", "error");
-        showCaptchaRetry();
-      }
-    }, 5000);
   } catch (error) {
-    updateContinueState();
-    setStatus(error.message || "Gagal memuat CAPTCHA. Tekan Muat Ulang CAPTCHA untuk mencoba lagi.", "error");
-    showCaptchaRetry();
+    setStatus(error.message || "Gagal memuat CAPTCHA.", "error");
   }
 }
 
