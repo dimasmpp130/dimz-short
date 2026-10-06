@@ -8,6 +8,8 @@ const spinner = document.querySelector("#verifySpinner");
 const createButton = document.querySelector("#createLinkBtn");
 let recaptchaToken = "";
 let submitted = false;
+let recaptchaWidgetId = null;
+let captchaRenderTimer = null;
 
 function setStatus(text, type = "") {
   status.textContent = text;
@@ -21,30 +23,44 @@ function showCaptchaRetry() {
     retry.id = "captchaRetry";
     retry.type = "button";
     retry.textContent = "Muat Ulang CAPTCHA";
-    retry.style.cssText =
-      "display:block;margin:8px auto 0;border:0;background:transparent;color:#4f46e5;font-weight:700;cursor:pointer;padding:6px 10px";
+    retry.className = "captcha-retry";
     status.insertAdjacentElement("afterend", retry);
     retry.addEventListener("click", async () => {
-      retry.remove();
+      retry.disabled = true;
+      retry.textContent = "Memuat CAPTCHA...";
       recaptchaToken = "";
       createButton.disabled = true;
+      clearTimeout(captchaRenderTimer);
       wrap.innerHTML = "";
-      await renderCaptcha();
+      recaptchaWidgetId = null;
+      await renderCaptcha(true);
     });
   }
+  retry.disabled = false;
 }
 
-async function renderCaptcha() {
+function removeCaptchaRetry() {
+  document.querySelector("#captchaRetry")?.remove();
+}
+
+function captchaLooksRendered() {
+  return Boolean(wrap?.querySelector("iframe, textarea[name='g-recaptcha-response'], .g-recaptcha-response"));
+}
+
+async function renderCaptcha(force = false) {
+  clearTimeout(captchaRenderTimer);
   try {
     const config = await getConfig();
-    if (!config.recaptchaSiteKey) {
-      throw new Error("CAPTCHA belum dikonfigurasi oleh admin.");
-    }
+    if (!config.recaptchaSiteKey) throw new Error("CAPTCHA belum dikonfigurasi oleh admin.");
 
     const recaptcha = await loadRecaptcha();
-    wrap.innerHTML = "";
+    if (!force && recaptchaWidgetId !== null && captchaLooksRendered()) return;
 
-    recaptcha.render(wrap, {
+    recaptchaToken = "";
+    createButton.disabled = true;
+    removeCaptchaRetry();
+    wrap.innerHTML = "";
+    recaptchaWidgetId = recaptcha.render(wrap, {
       sitekey: config.recaptchaSiteKey,
       theme: "light",
       callback: token => {
@@ -57,24 +73,26 @@ async function renderCaptcha() {
       "expired-callback": () => {
         recaptchaToken = "";
         createButton.disabled = true;
-        setStatus("CAPTCHA kedaluwarsa. Silakan ulangi.", "error");
+        setStatus("CAPTCHA kedaluwarsa. Silakan verifikasi lagi.", "error");
       },
       "error-callback": () => {
         recaptchaToken = "";
         createButton.disabled = true;
-        setStatus(
-          "CAPTCHA gagal dimuat. Coba muat ulang CAPTCHA.",
-          "error"
-        );
+        setStatus("CAPTCHA gagal dimuat. Tekan Muat Ulang CAPTCHA jika kotaknya tidak muncul.", "error");
         showCaptchaRetry();
       }
     });
+
+    // Jangan melakukan reload berulang. Cek sekali setelah Google diberi waktu merender.
+    captchaRenderTimer = setTimeout(() => {
+      if (!captchaLooksRendered() && !recaptchaToken) {
+        setStatus("CAPTCHA belum muncul. Tekan Muat Ulang CAPTCHA untuk mencoba lagi.", "error");
+        showCaptchaRetry();
+      }
+    }, 5000);
   } catch (error) {
     createButton.disabled = true;
-    setStatus(
-      error.message || "Gagal memuat CAPTCHA. Coba lagi.",
-      "error"
-    );
+    setStatus(error.message || "Gagal memuat CAPTCHA. Tekan Muat Ulang CAPTCHA untuk mencoba lagi.", "error");
     showCaptchaRetry();
   }
 }
