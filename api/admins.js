@@ -1,401 +1,821 @@
-import crypto from "crypto";
-
-const REDIS_URL = process.env.DIMZLINK_KV_REST_API_URL;
-const REDIS_TOKEN = process.env.DIMZLINK_KV_REST_API_TOKEN;
-const ADMIN_PASSWORD = process.env.DIMZLINK_ADMIN_PASSWORD || "";
-const ADMIN_PASSWORD_HASH = process.env.DIMZLINK_ADMIN_PASSWORD_HASH || "";
-const ADMIN_SECRET = process.env.DIMZLINK_ADMIN_SECRET || "";
-const SESSION_MAX_AGE = 6 * 60 * 60 * 1000;
-const LOGIN_RATE = { limit: 8, window: 15 * 60 };
-
-function setSecurityHeaders(res) {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';");
+* {
+  box-sizing: border-box;
 }
 
-function json(res, status, data) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "no-store");
-  setSecurityHeaders(res);
-  res.end(JSON.stringify(data));
+html {
+  scroll-behavior: smooth;
 }
 
-function redisReady() { return Boolean(REDIS_URL && REDIS_TOKEN); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #07080c;
+  color: #f5f7fb;
+}
 
-async function loginRateLimit(req) {
-  const ip = String(req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
-  const key = `dimz:admin-login:${sha256(ip)}`;
-  const count = Number(await redisCommand("INCR", key));
-  if (count === 1) await redisCommand("EXPIRE", key, LOGIN_RATE.window);
-  if (count > LOGIN_RATE.limit) {
-    const e = new Error("Terlalu banyak percobaan login. Silakan coba lagi beberapa menit.");
-    e.status = 429;
-    throw e;
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  padding: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.065),
+    rgba(255, 255, 255, 0.025)
+  );
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+}
+
+.logo {
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 17px;
+  background: linear-gradient(135deg, #ffffff, #8d93a1);
+  color: #08090d;
+  font-size: 27px;
+  font-weight: 900;
+  margin-bottom: 20px;
+}
+
+.login-card h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  letter-spacing: -0.7px;
+}
+
+.login-card p {
+  margin: 0 0 25px;
+  color: #969baa;
+  line-height: 1.6;
+}
+
+.field {
+  margin-bottom: 15px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 7px;
+  color: #b9bdc8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #fff;
+  padding: 13px 14px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.input:focus {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.btn {
+  border: 0;
+  border-radius: 13px;
+  padding: 12px 17px;
+  font-weight: 800;
+  transition: transform 0.15s, opacity 0.15s, background 0.15s;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  width: 100%;
+  background: #fff;
+  color: #08090d;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-danger {
+  background: rgba(255, 70, 70, 0.12);
+  color: #ff8c8c;
+  border: 1px solid rgba(255, 70, 70, 0.2);
+}
+
+.login-error {
+  margin-top: 13px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  background: rgba(255, 70, 70, 0.09);
+  color: #ff9b9b;
+  font-size: 13px;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(7, 8, 12, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.topbar-inner {
+  width: min(1450px, calc(100% - 32px));
+  min-height: 72px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 39px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #fff;
+  color: #07080c;
+  font-weight: 900;
+}
+
+.brand-title {
+  font-weight: 900;
+  letter-spacing: -0.3px;
+}
+
+.brand-sub {
+  color: #777c88;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.top-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.container {
+  width: min(1450px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 30px 0 60px;
+}
+
+.heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+.heading h1 {
+  margin: 0;
+  font-size: clamp(25px, 4vw, 38px);
+  letter-spacing: -1px;
+}
+
+.heading p {
+  margin: 7px 0 0;
+  color: #858a97;
+  font-size: 14px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.stat-label {
+  color: #858a97;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 27px;
+  font-weight: 900;
+  letter-spacing: -0.8px;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(175px, 0.22fr) minmax(175px, 0.22fr);
+  gap: 10px;
+  margin-bottom: 15px;
+  width: 100%;
+}
+
+.toolbar .search {
+  width: 100%;
+  min-width: 0;
+}
+
+.toolbar select.input {
+  width: 100%;
+  min-width: 0;
+  appearance: auto;
+  -webkit-appearance: auto;
+  color-scheme: dark;
+  background-color: #11131a;
+  color: #f5f7fb;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f5f7fb;
+}
+
+.toolbar select.input option {
+  background: #11131a;
+  color: #f5f7fb;
+}
+
+.toolbar select.input:focus {
+  background-color: #151821;
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.table-card {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 950px;
+}
+
+th {
+  padding: 14px 15px;
+  text-align: left;
+  color: #777d89;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  white-space: nowrap;
+}
+
+td {
+  padding: 14px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.alias {
+  font-weight: 900;
+}
+
+.destination {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #9ca1ad;
+}
+
+.clicks {
+  font-weight: 900;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.065);
+  color: #cdd0d8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.small-btn {
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.small-btn.delete {
+  color: #ff9696;
+  border-color: rgba(255, 70, 70, 0.16);
+  background: rgba(255, 70, 70, 0.08);
+}
+
+.empty {
+  padding: 50px 20px;
+  text-align: center;
+  color: #777c87;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(7px);
+}
+
+.modal {
+  width: min(680px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 22px;
+  background: #0d0f14;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55);
+  padding: 23px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.close {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  font-size: 18px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.click-list {
+  display: grid;
+  gap: 9px;
+}
+
+.click-item {
+  padding: 13px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.click-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.click-time {
+  color: #7d828e;
+  font-size: 11px;
+}
+
+.click-info {
+  color: #989da9;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 300;
+  max-width: 350px;
+  padding: 13px 15px;
+  border-radius: 13px;
+  background: #fff;
+  color: #08090d;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  font-weight: 800;
+  transform: translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.25s;
+}
+
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-function sha256(value) { return crypto.createHash("sha256").update(String(value)).digest("hex"); }
-
-function safeEqual(a, b) {
-  const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
-}
-
-function verifyScrypt(password, stored) {
-  const parts = String(stored || "").split("$");
-  if (parts.length !== 6 || parts[0] !== "scrypt") return false;
-  try {
-    const [, n, r, p, saltHex, hashHex] = parts;
-    const derived = crypto.scryptSync(String(password), Buffer.from(saltHex, "hex"), 64, {
-      N: Number(n), r: Number(r), p: Number(p), maxmem: 32 * 1024 * 1024
-    });
-    return safeEqual(derived.toString("hex"), hashHex);
-  } catch { return false; }
-}
-
-function verifyAdminPassword(password) {
-  if (ADMIN_PASSWORD_HASH) {
-    return verifyScrypt(password, ADMIN_PASSWORD_HASH) || safeEqual(sha256(password), ADMIN_PASSWORD_HASH);
-  }
-  return ADMIN_PASSWORD && safeEqual(password, ADMIN_PASSWORD);
-}
-
-function redisCommand(command, ...args) {
-  const encoded = args.map((value) => encodeURIComponent(String(value)));
-  return fetch(`${REDIS_URL}/${command}/${encoded.join("/")}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
-  }).then(async (response) => {
-    if (!response.ok) throw new Error(`Redis error ${response.status}`);
-    const data = await response.json();
-    return data.result;
-  });
-}
-
-function parseCookies(req) {
-  const cookie = String(req.headers?.cookie || "");
-  return Object.fromEntries(cookie.split(";").map((part) => {
-    const i = part.indexOf("=");
-    return i > -1 ? [part.slice(0, i).trim(), decodeURIComponent(part.slice(i + 1).trim())] : null;
-  }).filter(Boolean));
-}
-
-function makeSessionToken() {
-  if (!ADMIN_SECRET) throw new Error("DIMZLINK_ADMIN_SECRET belum dikonfigurasi.");
-  const expires = Date.now() + SESSION_MAX_AGE;
-  const nonce = crypto.randomBytes(24).toString("hex");
-  const sig = sha256(`${expires}.${nonce}.${ADMIN_SECRET}`);
-  return `${expires}.${nonce}.${sig}`;
-}
-
-function validateSession(token) {
-  if (!token || !ADMIN_SECRET) return false;
-  const [expires, nonce, sig] = String(token).split(".");
-  if (!expires || !nonce || !sig || Number(expires) <= Date.now()) return false;
-  return safeEqual(sig, sha256(`${expires}.${nonce}.${ADMIN_SECRET}`));
-}
-
-function isAuthenticated(req) {
-  return validateSession(parseCookies(req).dimzlink_admin);
-}
-
-function setSessionCookie(res, token) {
-  res.setHeader("Set-Cookie", `dimzlink_admin=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${Math.floor(SESSION_MAX_AGE / 1000)}`);
-}
-
-function clearSessionCookie(res) {
-  res.setHeader("Set-Cookie", "dimzlink_admin=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
-}
-
-async function parseBody(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  return new Promise((resolve, reject) => {
-    let raw = "";
-    req.on("data", (chunk) => { raw += chunk; if (raw.length > 200000) reject(new Error("Request terlalu besar.")); });
-    req.on("end", () => {
-      if (!raw) return resolve({});
-      try { resolve(JSON.parse(raw)); } catch { reject(new Error("Format permintaan tidak valid.")); }
-    });
-    req.on("error", reject);
-  });
-}
-
-function validUrl(value) {
-  try { const u = new URL(String(value)); return u.protocol === "http:" || u.protocol === "https:"; } catch { return false; }
-}
-
-function hashLinkPassword(password) {
-  const salt = crypto.randomBytes(16);
-  const hash = crypto.scryptSync(String(password), salt, 64, { N: 16384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 });
-  return `scrypt$16384$8$1$${salt.toString("hex")}$${hash.toString("hex")}`;
-}
-
-async function getAllLinks() {
-  let aliases = await redisCommand("SMEMBERS", "dimzlink:index");
-  aliases = Array.isArray(aliases) ? [...new Set(aliases.map(String))] : [];
-  if (!aliases.length) {
-    let cursor = "0";
-    do {
-      const result = await redisCommand("SCAN", cursor, "MATCH", "dimzlink:*", "COUNT", "100");
-      cursor = String(result?.[0] ?? "0");
-      for (const key of result?.[1] || []) {
-        const value = String(key);
-        if (!value.startsWith("dimzlink:clicks:") && !value.startsWith("dimzlink:events:") && value !== "dimzlink:index") aliases.push(value.replace(/^dimzlink:/, ""));
-      }
-    } while (cursor !== "0");
-    aliases = [...new Set(aliases)];
-    for (const alias of aliases) await redisCommand("SADD", "dimzlink:index", alias);
+@media (max-width: 620px) {
+  .topbar-inner,
+  .container {
+    width: min(100% - 22px, 1450px);
   }
 
-  const links = (await Promise.all(aliases.map(async (alias) => {
-    try {
-      const [raw, clicksRaw, eventsRaw] = await Promise.all([
-        redisCommand("GET", `dimzlink:${alias}`),
-        redisCommand("GET", `dimzlink:clicks:${alias}`),
-        redisCommand("LRANGE", `dimzlink:events:${alias}`, 0, 499)
-      ]);
-      if (!raw) return null;
-      const link = JSON.parse(raw);
-      link.clicks = Number(clicksRaw || link.clicks || 0);
-      link.events = (Array.isArray(eventsRaw) ? eventsRaw : []).map((x) => {
-        try { return JSON.parse(x); } catch { return null; }
-      }).filter(Boolean);
-      return link;
-    } catch { return null; }
-  }))).filter(Boolean);
-  return links;
-}
-
-function publicAdminLink(link) {
-  return {
-    alias: link.alias,
-    destination: link.destination,
-    createdAt: link.createdAt || null,
-    expiresAt: link.expiresAt || null,
-    clicks: Number(link.clicks || 0),
-    lastClickAt: link.lastClickAt || null,
-    paused: Boolean(link.paused),
-    passwordProtected: Boolean(link.passwordHash),
-    recentClicks: Array.isArray(link.events) ? link.events.slice(0, 200) : []
-  };
-}
-
-function buildStats(links, from = null, to = null) {
-  const stats = {
-    totalLinks: links.length,
-    totalClicks: 0,
-    uniqueVisitors: new Set(),
-    human: 0,
-    bot: 0,
-    countries: {}, devices: {}, operatingSystems: {}, browsers: {}, languages: {}, referrers: {},
-    clicksByHour: {}, clicksByDay: {}
-  };
-
-  const bump = (obj, key) => { const k = key || "Tidak diketahui"; obj[k] = (obj[k] || 0) + 1; };
-
-  for (const link of links) {
-    const events = Array.isArray(link.events) ? link.events : [];
-    if (!from && !to) stats.totalClicks += Number(link.clicks || 0);
-    for (const e of events) {
-      if (e.time) {
-        const ms = Date.parse(e.time);
-        if (!Number.isNaN(ms) && ((from && ms < from) || (to && ms > to))) continue;
-        if (from || to) stats.totalClicks++;
-      }
-      if (e.visitor) stats.uniqueVisitors.add(e.visitor);
-      e.type === "bot" ? stats.bot++ : stats.human++;
-      bump(stats.countries, e.country);
-      bump(stats.devices, e.device);
-      bump(stats.operatingSystems, e.os);
-      bump(stats.browsers, e.browser);
-      bump(stats.languages, e.language);
-      bump(stats.referrers, e.referrer);
-      if (e.time) {
-        const d = new Date(e.time);
-        if (!Number.isNaN(d.getTime())) {
-          bump(stats.clicksByHour, String(d.getUTCHours()).padStart(2, "0") + ":00");
-          bump(stats.clicksByDay, d.toISOString().slice(0, 10));
-        }
-      }
-    }
+  .topbar-inner {
+    min-height: 64px;
   }
-  stats.uniqueVisitors = stats.uniqueVisitors.size;
-  return stats;
-}
 
-function isPrivateHostname(hostname) {
-  const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
-  const m = host.match(/^172\.(\d+)\./);
-  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true;
-  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return true;
-  return false;
-}
+  .brand-sub {
+    display: none;
+  }
 
-function validateDestination(value) {
-  const text = String(value || "").trim();
-  if (text.length > 4096) throw Object.assign(new Error("URL tujuan terlalu panjang."), {status:400});
-  try {
-    const url = new URL(text);
-    if (url.protocol !== "http:" && url.protocol !== "https:") throw Object.assign(new Error("URL tujuan harus menggunakan HTTP atau HTTPS."), {status:400});
-    if (url.username || url.password) throw Object.assign(new Error("URL dengan kredensial tertanam tidak diizinkan."), {status:400});
-    if (isPrivateHostname(url.hostname)) throw Object.assign(new Error("URL tujuan ke alamat lokal/private tidak diizinkan."), {status:400});
-    const blocked = ["dimz-short.vercel.app", "link.dimz-wtf.web.id"];
-    if (blocked.includes(url.hostname.toLowerCase())) throw Object.assign(new Error("URL tujuan tidak diizinkan."), {status:400});
-    return url.toString();
-  } catch (e) {
-    if (e?.status) throw e;
-    throw Object.assign(new Error("URL tujuan tidak valid."), {status:400});
+  .heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+
+  .stat {
+    padding: 15px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar .search,
+  .toolbar select.input {
+    width: 100%;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .modal {
+    padding: 18px;
+  }
+
+  .login-card {
+    padding: 23px;
+  }
+}
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 20px;
+}
+.analytics-grid.compact {
+  margin-top: 4px;
+}
+.analytics-card {
+  padding: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.analytics-card > strong {
+  display: block;
+  margin-bottom: 10px;
+}
+.stat-list {
+  display: grid;
+  gap: 7px;
+  color: #aeb3be;
+  font-size: 12px;
+}
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.stat-row b {
+  color: #fff;
+}
+.muted {
+  color: #737987;
+}
+.pill.success {
+  color: #91e4b9;
+  background: rgba(50, 200, 120, 0.1);
+}
+.pill.danger {
+  color: #ff9b9b;
+  background: rgba(255, 70, 70, 0.1);
+}
+.modal-wide {
+  width: min(900px, 100%);
+}
+.modal-sub {
+  color: #858a97;
+  margin: 5px 0 0;
+  font-size: 12px;
+}
+.inline-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #b9bdc8;
+  font-size: 13px;
+}
+.qr-admin {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  margin-top: 12px;
+  position: relative;
+}
+.qr-admin.qr-overlay {
+  display: inline-grid;
+  width: 250px;
+  margin: 12px auto;
+}
+.qr-admin .qr-logo {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 7px;
+  padding: 4px;
+  background: #fff;
+  box-sizing: content-box;
+}
+.qr-source-switch {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+}
+.qr-source-btn {
+  flex: 1;
+  border: 1px solid #303542;
+  background: #171a21;
+  color: #aeb3be;
+  border-radius: 9px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+.qr-source-btn.active {
+  border-color: #6c63ff;
+  color: #fff;
+  background: rgba(108, 99, 255, 0.12);
+}
+.qr-file-name {
+  margin-top: 7px;
+  color: #858a97;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1050px) {
+  .analytics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+  .actions {
+    flex-wrap: wrap;
   }
 }
 
-async function updateLink(body) {
-  const alias = String(body.alias || "").trim();
-  const raw = await redisCommand("GET", `dimzlink:${alias}`);
-  if (!raw) { const e = new Error("Shortlink tidak ditemukan."); e.status = 404; throw e; }
-  const link = JSON.parse(raw);
-  const destination = validateDestination(body.destination);
-  link.destination = destination;
-  if (Object.prototype.hasOwnProperty.call(body, "expiresAt")) {
-    if (!body.expiresAt) link.expiresAt = null;
-    else {
-      const date = new Date(body.expiresAt);
-      if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) throw new Error("Tanggal kedaluwarsa tidak valid.");
-      link.expiresAt = date.toISOString();
-    }
+.settings-card {
+  margin: 0 0 20px;
+  padding: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.settings-grid .field {
+  margin: 0;
+}
+.settings-grid .field > span,
+.date-filter > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #b9bdc8;
+  font-size: 12px;
+  font-weight: 700;
+}
+.date-filter {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin: 0 0 16px;
+  flex-wrap: wrap;
+}
+.date-filter .input {
+  width: auto;
+  min-width: 150px;
+}
+.date-filter > span {
+  margin: 0 4px 9px 0;
+}
+@media (max-width: 700px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
   }
-  if (String(body.password || "").trim()) link.passwordHash = hashLinkPassword(body.password);
-  if (body.removePassword === true) link.passwordHash = null;
-  await redisCommand("SET", `dimzlink:${alias}`, JSON.stringify(link));
-  return link;
-}
-
-async function deleteLink(alias) {
-  await redisCommand("DEL", `dimzlink:${alias}`);
-  await redisCommand("DEL", `dimzlink:clicks:${alias}`);
-  await redisCommand("DEL", `dimzlink:events:${alias}`);
-  await redisCommand("SREM", "dimzlink:index", alias);
-}
-
-async function resetStats(alias) {
-  const safeAlias = String(alias || "").trim();
-  const raw = await redisCommand("GET", `dimzlink:${safeAlias}`);
-  if (!raw) { const e = new Error("Shortlink tidak ditemukan."); e.status = 404; throw e; }
-  const link = JSON.parse(raw);
-  link.clicks = 0;
-  link.lastClickAt = null;
-  link.clickLog = [];
-  await redisCommand("SET", `dimzlink:${safeAlias}`, JSON.stringify(link));
-  await redisCommand("DEL", `dimzlink:clicks:${safeAlias}`);
-  await redisCommand("DEL", `dimzlink:events:${safeAlias}`);
-  return link;
-}
-
-function csvEscape(value) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
-async function exportCsv() {
-  const links = await getAllLinks();
-  const rows = ["Waktu,Alias,Tipe,Negara,Perangkat,OS,Browser,Bahasa,Referrer"];
-  for (const link of links) {
-    for (const e of link.events || []) {
-      rows.push([
-        e.time, link.alias, e.type, e.country, e.device, e.os, e.browser, e.language, e.referrer
-      ].map(csvEscape).join(","));
-    }
+  .date-filter .input {
+    width: 100%;
+    min-width: 0;
   }
-  return rows.join("\n");
+  .date-filter .btn {
+    flex: 1;
+  }
+}
+.qr-admin .qr-logo {
+  width: 32px;
+  height: 32px;
+  padding: 3px;
+  border-radius: 7px;
+  box-sizing: content-box;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.qr-admin.qr-overlay {
+  display: inline-grid;
+  width: 250px;
+  margin: 12px auto;
 }
 
-export default async function handler(req, res) {
-  if (!redisReady()) return json(res, 500, { ok: false, error: "Redis belum dikonfigurasi." });
-  setSecurityHeaders(res);
-  const method = String(req.method || "GET").toUpperCase();
 
-  try {
-    if (method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+/* ===== Responsive hardening ===== */
+html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+.app, .container, .topbar, .topbar-inner, .heading, .settings-card,
+.stats, .analytics-grid, .toolbar, .table-card, .modal-backdrop, .modal { min-width: 0; }
+.top-actions { min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+.top-actions .btn { white-space: nowrap; }
+.settings-grid > *, .stats > *, .analytics-grid > *, .toolbar > * { min-width: 0; }
+.input, select, textarea, input { max-width: 100%; }
+.table-scroll { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.modal-backdrop { overflow: auto; }
+.modal { width: min(680px, calc(100vw - 24px)); margin: auto; }
+.modal-wide { width: min(900px, calc(100vw - 24px)); }
+.modal-head > * { min-width: 0; }
+.modal-actions { flex-wrap: wrap; }
+.modal-actions .btn { flex: 0 1 auto; }
+.qr-source-switch { width: 100%; }
+.qr-source-btn { min-width: 0; }
+.qr-file-picker { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.qr-file-picker .btn { flex: 0 0 auto; }
+.qr-file-input { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+.qr-preview { display: none; width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #fff; }
+.qr-preview.show { display: block; }
 
-    if (method === "GET") {
-      if (!isAuthenticated(req)) return json(res, 401, { ok: false, authenticated: false, error: "Admin belum login." });
-      const query = req.query || {};
-      if (String(query.action || "") === "export") {
-        const csv = await exportCsv();
-        res.statusCode = 200;
-        res.setHeader("Content-Type", "text/csv; charset=utf-8");
-        res.setHeader("Content-Disposition", 'attachment; filename="dimz-analytics.csv"');
-        setSecurityHeaders(res);
-        return res.end(csv);
-      }
-      const links = await getAllLinks();
-      const from = query.from ? Date.parse(String(query.from)) : null;
-      const to = query.to ? Date.parse(String(query.to)) : null;
-      const stats = buildStats(links, Number.isNaN(from) ? null : from, Number.isNaN(to) ? null : to);
-      return json(res, 200, {
-        ok: true, authenticated: true,
-        links: links.map(publicAdminLink).sort((a,b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0)),
-        stats
-      });
-    }
+@media (max-width: 760px) {
+  .topbar-inner { align-items: flex-start; padding: 10px 0; flex-direction: column; }
+  .top-actions { width: 100%; justify-content: stretch; }
+  .top-actions .btn { flex: 1 1 0; min-width: 0; }
+  .container { padding-top: 22px; }
+  .heading { margin-bottom: 18px; }
+  .modal-actions .btn { flex: 1 1 140px; }
+}
 
-    if (method !== "POST") return json(res, 405, { ok: false, error: "Metode tidak didukung." });
-    const body = await parseBody(req);
-    const action = String(body.action || "");
+@media (max-width: 520px) {
+  .top-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .top-actions .btn:last-child { grid-column: 1 / -1; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .stat { min-height: 92px; }
+  .stat-label { font-size: 10px; }
+  .stat-value { font-size: 20px; }
+  .toolbar { gap: 8px; }
+  .modal-backdrop { padding: 10px; align-items: flex-start; }
+  .modal, .modal-wide { width: 100%; max-height: calc(100dvh - 20px); margin: 0; border-radius: 17px; padding: 15px; }
+  .modal-head { gap: 9px; margin-bottom: 15px; }
+  .close { flex: 0 0 34px; }
+  .qr-admin { min-height: 190px; overflow: hidden; }
+  .qr-admin.qr-overlay { max-width: 100%; width: min(250px, 100%); }
+  .qr-admin canvas, .qr-admin img:not(.qr-logo) { max-width: 100%; height: auto; }
+  .qr-file-picker { align-items: stretch; }
+  .qr-file-picker .btn { width: 100%; }
+  .qr-preview { margin: 0 auto; }
+  .actions { max-width: 100%; }
+  .small-btn { min-height: 34px; }
+}
 
-    if (action === "login") {
-      await loginRateLimit(req);
-      if (!verifyAdminPassword(String(body.password || ""))) return json(res, 401, { ok: false, error: "Password admin salah." });
-      setSessionCookie(res, makeSessionToken());
-      return json(res, 200, { ok: true, authenticated: true });
-    }
-
-    if (action === "logout") {
-      clearSessionCookie(res);
-      return json(res, 200, { ok: true });
-    }
-
-    if (!isAuthenticated(req)) return json(res, 401, { ok: false, error: "Sesi admin sudah berakhir." });
-
-    if (action === "update") return json(res, 200, { ok: true, link: publicAdminLink(await updateLink(body)) });
-
-    if (action === "state") {
-      const alias = String(body.alias || "");
-      const raw = await redisCommand("GET", `dimzlink:${alias}`);
-      if (!raw) return json(res, 404, { ok: false, error: "Shortlink tidak ditemukan." });
-      const link = JSON.parse(raw); link.paused = Boolean(body.paused);
-      await redisCommand("SET", `dimzlink:${alias}`, JSON.stringify(link));
-      return json(res, 200, { ok: true, link: publicAdminLink(link) });
-    }
-
-    if (action === "delete") {
-      await deleteLink(String(body.alias || ""));
-      return json(res, 200, { ok: true });
-    }
-
-    if (action === "resetStats") {
-      return json(res, 200, { ok: true, link: publicAdminLink(await resetStats(String(body.alias || ""))) });
-    }
-
-    if (action === "export") {
-      const csv = await exportCsv();
-      setSecurityHeaders(res);
-      res.statusCode = 200;
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", 'attachment; filename="dimz-analytics.csv"');
-      return res.end(csv);
-    }
-
-    return json(res, 400, { ok: false, error: "Aksi tidak dikenali." });
-  } catch (error) {
-    console.error("DIMZ ADMIN API:", error);
-    const status = Number(error?.status) || 500;
-    const message = status >= 500 ? "Terjadi kesalahan server. Silakan coba lagi." : (error?.message || "Permintaan tidak dapat diproses.");
-    return json(res, status, { ok: false, error: message });
-  }
+@media (max-width: 380px) {
+  .topbar-inner, .container { width: calc(100% - 16px); }
+  .brand-title { font-size: 14px; }
+  .stats { gap: 7px; }
+  .stat { padding: 12px; }
+  .stat-value { font-size: 18px; }
 }
