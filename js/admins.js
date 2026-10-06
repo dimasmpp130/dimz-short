@@ -138,6 +138,7 @@ function openStats(link) {
 
 let adminQrLogoSource = "/assets/icon/qr-create.png";
 let adminQrSourceMode = "url";
+let adminQrObjectUrl = "";
 
 function setAdminQrSourceMode(mode) {
   adminQrSourceMode = mode === "gallery" ? "gallery" : "url";
@@ -148,24 +149,34 @@ function setAdminQrSourceMode(mode) {
 }
 
 function getAdminQrLogo() {
-  if (adminQrSourceMode === "gallery") {
-    const file = $("adminQrLogoFile")?.files?.[0];
-    return file ? URL.createObjectURL(file) : adminQrLogoSource;
-  }
+  if (adminQrSourceMode === "gallery") return adminQrObjectUrl || adminQrLogoSource;
   return String($("adminQrLogoUrl")?.value || "").trim() || adminQrLogoSource;
+}
+
+function clearAdminQrFile() {
+  if (adminQrObjectUrl) {
+    URL.revokeObjectURL(adminQrObjectUrl);
+    adminQrObjectUrl = "";
+  }
+  const fileInput = $("adminQrLogoFile");
+  if (fileInput) fileInput.value = "";
+  const name = $("adminQrFileName");
+  if (name) name.textContent = "Belum ada gambar dipilih.";
+  const preview = $("adminQrPreview");
+  if (preview) { preview.removeAttribute("src"); preview.classList.remove("show"); }
 }
 
 function openQr(link) {
   qrUrl=`${location.origin}/${encodeURIComponent(link.alias)}`;
   $("adminQrUrl").value=qrUrl;
   $("adminQrLogoUrl").value="";
-  $("adminQrLogoFile").value="";
-  $("adminQrFileName").textContent="Belum ada gambar dipilih.";
+  clearAdminQrFile();
   adminQrLogoSource="/assets/icon/qr-create.png";
   setAdminQrSourceMode("url");
   $("adminQrCanvas").innerHTML="";
   $("qrModal").classList.remove("hidden");
 }
+
 
 async function loadQrScript(){
   if(window.QRCode)return;
@@ -260,8 +271,6 @@ $("logoutButton").addEventListener("click",async()=>{
 $("searchInput").addEventListener("input",renderTable);
 $("statusFilter").addEventListener("change",renderTable);
 $("sortSelect").addEventListener("change",renderTable);
-$("applyAnalyticsFilter").addEventListener("click",loadDashboard);
-$("clearAnalyticsFilter").addEventListener("click",()=>{ $("analyticsFrom").value=""; $("analyticsTo").value=""; loadDashboard(); });
 function loadSettings(){ $("settingQrSize").value=localStorage.getItem("dimz_qr_size")||"240"; $("settingQrLogoSize").value=localStorage.getItem("dimz_qr_logo_size")||"small"; $("settingExpiry").value=localStorage.getItem("dimz_default_expiry")||"0"; }
 $("settingQrSize").addEventListener("change",e=>localStorage.setItem("dimz_qr_size",e.target.value));
 $("settingQrLogoSize").addEventListener("change",e=>localStorage.setItem("dimz_qr_logo_size",e.target.value));
@@ -274,7 +283,29 @@ $("adminQrUrlTab").addEventListener("click",()=>setAdminQrSourceMode("url"));
 $("adminQrGalleryTab").addEventListener("click",()=>setAdminQrSourceMode("gallery"));
 $("adminQrLogoFile").addEventListener("change",e=>{
   const file=e.target.files?.[0];
-  $("adminQrFileName").textContent=file ? file.name : "Belum ada gambar dipilih.";
+  if (adminQrObjectUrl) URL.revokeObjectURL(adminQrObjectUrl);
+  adminQrObjectUrl = "";
+  const preview = $("adminQrPreview");
+  if (!file) {
+    $("adminQrFileName").textContent = "Belum ada gambar dipilih.";
+    preview?.removeAttribute("src");
+    preview?.classList.remove("show");
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    e.target.value = "";
+    $("adminQrFileName").textContent = "File bukan gambar.";
+    preview?.removeAttribute("src");
+    preview?.classList.remove("show");
+    toast("Pilih file gambar yang valid.");
+    return;
+  }
+  adminQrObjectUrl = URL.createObjectURL(file);
+  $("adminQrFileName").textContent = file.name;
+  if (preview) {
+    preview.src = adminQrObjectUrl;
+    preview.classList.add("show");
+  }
 });
 $("adminGenerateQr").addEventListener("click",generateAdminQr);
 $("adminDownloadQrPng").addEventListener("click",()=>downloadAdminQr("png"));
