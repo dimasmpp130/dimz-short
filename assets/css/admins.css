@@ -758,7 +758,6 @@ tbody tr:hover {
 }
 
 
-/* ===== Responsive hardening ===== */
 html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
 .app, .container, .topbar, .topbar-inner, .heading, .settings-card,
 .stats, .analytics-grid, .toolbar, .table-card, .modal-backdrop, .modal { min-width: 0; }
@@ -818,4 +817,64 @@ html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
   .stats { gap: 7px; }
   .stat { padding: 12px; }
   .stat-value { font-size: 18px; }
+}
+
+#adminDownloadQrPng,
+#adminDownloadQrSvg {
+  flex: 1 1 0;
+  min-width: 140px;
+  min-height: 46px;
+  width: 100%;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+#adminQrCanvas .qr-render {
+  display: block;
+  width: min(600px, 100%);
+  height: auto;
+  max-width: 100%;
+  background: #fff;
+}
+
+@media (max-width: 520px) {
+  #adminDownloadQrPng,
+  #adminDownloadQrSvg {
+    min-width: 0;
+    flex: 1 1 50%;
+  }
+}
+
+#qrModal .modal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#qrModal #adminGenerateQr {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+}
+
+#qrModal #adminDownloadQrPng,
+#qrModal #adminDownloadQrSvg {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  justify-content: center;
+}
+
+@media (max-width: 420px) {
+  #qrModal .modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #qrModal #adminGenerateQr,
+  #qrModal #adminDownloadQrPng,
+  #qrModal #adminDownloadQrSvg {
+    grid-column: auto;
+  }
 }
