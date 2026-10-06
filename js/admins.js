@@ -87,6 +87,7 @@ function renderTable() {
         <button class="small-btn" data-action="edit" data-alias="${esc(link.alias)}">Edit</button>
         <button class="small-btn" data-action="qr" data-alias="${esc(link.alias)}">QR</button>
         <button class="small-btn" data-action="state" data-alias="${esc(link.alias)}">${link.paused?"Resume":"Pause"}</button>
+        <button class="small-btn" data-action="reset" data-alias="${esc(link.alias)}">Reset</button>
         <button class="small-btn delete" data-action="delete" data-alias="${esc(link.alias)}">Delete</button>
       </div></td>
     </tr>`;
@@ -96,7 +97,11 @@ function renderTable() {
 async function loadDashboard() {
   $("refreshButton").disabled=true;
   try {
-    const data=await api();
+    const params=new URLSearchParams();
+    const from=$("analyticsFrom")?.value; const to=$("analyticsTo")?.value;
+    if(from) params.set("from", `${from}T00:00:00`);
+    if(to) params.set("to", `${to}T23:59:59.999`);
+    const data=await api(params.toString()?`${API_URL}?${params}`:API_URL);
     if(!data.authenticated){showLogin();return;}
     allLinks=Array.isArray(data.links)?data.links:[];
     renderStats(data.stats||{});
@@ -131,34 +136,83 @@ function openStats(link) {
   $("clickModal").classList.remove("hidden");
 }
 
+let adminQrLogoSource = "/assets/icon/qr-create.png";
+let adminQrSourceMode = "url";
+
+function setAdminQrSourceMode(mode) {
+  adminQrSourceMode = mode === "gallery" ? "gallery" : "url";
+  $("adminQrUrlTab")?.classList.toggle("active", adminQrSourceMode === "url");
+  $("adminQrGalleryTab")?.classList.toggle("active", adminQrSourceMode === "gallery");
+  $("adminQrUrlWrap")?.classList.toggle("hidden", adminQrSourceMode !== "url");
+  $("adminQrGalleryWrap")?.classList.toggle("hidden", adminQrSourceMode !== "gallery");
+}
+
+function getAdminQrLogo() {
+  if (adminQrSourceMode === "gallery") {
+    const file = $("adminQrLogoFile")?.files?.[0];
+    return file ? URL.createObjectURL(file) : adminQrLogoSource;
+  }
+  return String($("adminQrLogoUrl")?.value || "").trim() || adminQrLogoSource;
+}
+
 function openQr(link) {
   qrUrl=`${location.origin}/${encodeURIComponent(link.alias)}`;
   $("adminQrUrl").value=qrUrl;
-  $("adminQrLogo").value="/assets/icon/qr-create.png";
+  $("adminQrLogoUrl").value="";
+  $("adminQrLogoFile").value="";
+  $("adminQrFileName").textContent="Belum ada gambar dipilih.";
+  adminQrLogoSource="/assets/icon/qr-create.png";
+  setAdminQrSourceMode("url");
   $("adminQrCanvas").innerHTML="";
   $("qrModal").classList.remove("hidden");
 }
+
+async function loadQrScript(){
+  if(window.QRCode)return;
+  await new Promise((resolve,reject)=>{const src=document.createElement("script");src.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";src.onload=resolve;src.onerror=reject;document.head.appendChild(src);});
+}
+function qrLogoSize(){return localStorage.getItem("dimz_qr_logo_size") === "medium" ? 44 : 32;}
 async function generateAdminQr() {
   const box=$("adminQrCanvas"); box.innerHTML="";
   try {
-    const src=document.createElement("script");
-    if(!window.QRCode){
-      await new Promise((resolve,reject)=>{src.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";src.onload=resolve;src.onerror=reject;document.head.appendChild(src);});
-    }
-    new window.QRCode(box,{text:qrUrl,width:240,height:240,correctLevel:window.QRCode.CorrectLevel.H});
+    await loadQrScript();
+    const size=Number(localStorage.getItem("dimz_qr_size")||240);
+    new window.QRCode(box,{text:qrUrl,width:size,height:size,correctLevel:window.QRCode.CorrectLevel.H});
     setTimeout(()=>{
-      const img=box.querySelector("img,canvas");
-      if(!img)return;
+      const img=box.querySelector("img,canvas"); if(!img)return;
       box.classList.add("qr-overlay");
-      const logo=document.createElement("img"); logo.className="qr-logo"; logo.src=$("adminQrLogo").value||"/assets/icon/qr-create.png"; logo.alt="Logo";
-      box.appendChild(logo);
+      const logoSrc=getAdminQrLogo(); if(!logoSrc)return;
+      const logo=document.createElement("img"); logo.className="qr-logo"; logo.style.width=qrLogoSize()+"px"; logo.style.height=qrLogoSize()+"px"; logo.src=logoSrc; logo.alt="Logo QR"; logo.onerror=()=>logo.remove(); box.appendChild(logo);
+      if(adminQrSourceMode==="gallery"&&logoSrc.startsWith("blob:")){logo.addEventListener("load",()=>URL.revokeObjectURL(logoSrc),{once:true});logo.addEventListener("error",()=>URL.revokeObjectURL(logoSrc),{once:true});}
     },120);
-  } catch { toast("QR gagal dibuat."); }
+  } catch(error){console.error(error);toast("QR gagal dibuat.");}
+}
+async function getAdminQrCanvas(){
+  const source=$("adminQrCanvas")?.querySelector("canvas, img:not(.qr-logo)"); if(!source)return null;
+  const qr=document.createElement("canvas"); qr.width=qr.height=600; const qctx=qr.getContext("2d");
+  if(source.tagName.toLowerCase()==="canvas") qctx.drawImage(source,0,0,600,600);
+  else { const image=new Image(); image.crossOrigin="anonymous"; await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=source.src;}); qctx.drawImage(image,0,0,600,600); }
+  const logo=$("adminQrCanvas .qr-logo"); const canvas=document.createElement("canvas"); const size=720; canvas.width=canvas.height=size; const ctx=canvas.getContext("2d"); ctx.fillStyle="#fff";ctx.fillRect(0,0,size,size);
+  ctx.drawImage(qr,60,60,600,600);
+  if(logo?.complete&&logo.naturalWidth){const ls=qrLogoSize()*2.5;const pad=Math.round(ls*.16);ctx.fillStyle="#fff";ctx.beginPath();ctx.roundRect((size-ls)/2-pad,(size-ls)/2-pad,ls+pad*2,ls+pad*2,Math.round(ls*.18));ctx.fill();ctx.drawImage(logo,(size-ls)/2,(size-ls)/2,ls,ls);}
+  return canvas;
+}
+async function downloadAdminQr(format){
+  const canvas=await getAdminQrCanvas(); if(!canvas)return toast("Buat QR terlebih dahulu.");
+  const name=`dimz-${(qrUrl.split("/").pop()||"shortlink").replace(/[^A-Za-z0-9_-]/g,"-").slice(0,40)}`;
+  if(format==="png"){const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download=`${name}.png`;a.click();return;}
+  const data=canvas.toDataURL("image/png").replaceAll("&","&amp;").replaceAll('"','&quot;');
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720"><rect width="720" height="720" fill="#fff"/><image href="${data}" width="720" height="720"/></svg>`;
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));a.download=`${name}.svg`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
 async function changeState(alias, paused) {
   try { await api(API_URL,{method:"POST",body:JSON.stringify({action:"state",alias,paused})}); toast(paused?"Link dijeda.":"Link dilanjutkan."); await loadDashboard(); }
   catch(e){toast(e.message||"Gagal mengubah status.");}
+}
+async function resetStats(alias) {
+  if(!confirm(`Reset semua statistik untuk "${alias}"? Tindakan ini tidak dapat dibatalkan.`))return;
+  try{await api(API_URL,{method:"POST",body:JSON.stringify({action:"resetStats",alias})});toast("Statistik direset.");await loadDashboard();}catch(e){toast(e.message||"Gagal mereset statistik.");}
 }
 async function deleteLink(alias) {
   if(!confirm(`Hapus shortlink "${alias}"?`))return;
@@ -185,6 +239,7 @@ $("linksBody").addEventListener("click",e=>{
   if(b.dataset.action==="edit")openEdit(link);
   if(b.dataset.action==="qr")openQr(link);
   if(b.dataset.action==="state")changeState(link.alias,!link.paused);
+  if(b.dataset.action==="reset")resetStats(link.alias);
   if(b.dataset.action==="delete")deleteLink(link.alias);
 });
 $("editForm").addEventListener("submit",async e=>{
@@ -205,10 +260,25 @@ $("logoutButton").addEventListener("click",async()=>{
 $("searchInput").addEventListener("input",renderTable);
 $("statusFilter").addEventListener("change",renderTable);
 $("sortSelect").addEventListener("change",renderTable);
+$("applyAnalyticsFilter").addEventListener("click",loadDashboard);
+$("clearAnalyticsFilter").addEventListener("click",()=>{ $("analyticsFrom").value=""; $("analyticsTo").value=""; loadDashboard(); });
+function loadSettings(){ $("settingQrSize").value=localStorage.getItem("dimz_qr_size")||"240"; $("settingQrLogoSize").value=localStorage.getItem("dimz_qr_logo_size")||"small"; $("settingExpiry").value=localStorage.getItem("dimz_default_expiry")||"0"; }
+$("settingQrSize").addEventListener("change",e=>localStorage.setItem("dimz_qr_size",e.target.value));
+$("settingQrLogoSize").addEventListener("change",e=>localStorage.setItem("dimz_qr_logo_size",e.target.value));
+$("settingExpiry").addEventListener("change",e=>localStorage.setItem("dimz_default_expiry",e.target.value));
+loadSettings();
 $("closeEdit").addEventListener("click",closeEdit);$("cancelEdit").addEventListener("click",closeEdit);
 $("closeClicks").addEventListener("click",()=>$("clickModal").classList.add("hidden"));
 $("closeQr").addEventListener("click",()=>$("qrModal").classList.add("hidden"));
+$("adminQrUrlTab").addEventListener("click",()=>setAdminQrSourceMode("url"));
+$("adminQrGalleryTab").addEventListener("click",()=>setAdminQrSourceMode("gallery"));
+$("adminQrLogoFile").addEventListener("change",e=>{
+  const file=e.target.files?.[0];
+  $("adminQrFileName").textContent=file ? file.name : "Belum ada gambar dipilih.";
+});
 $("adminGenerateQr").addEventListener("click",generateAdminQr);
+$("adminDownloadQrPng").addEventListener("click",()=>downloadAdminQr("png"));
+$("adminDownloadQrSvg").addEventListener("click",()=>downloadAdminQr("svg"));
 $("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeEdit();});
 $("clickModal").addEventListener("click",e=>{if(e.target===$("clickModal"))$("clickModal").classList.add("hidden");});
 $("qrModal").addEventListener("click",e=>{if(e.target===$("qrModal"))$("qrModal").classList.add("hidden");});
