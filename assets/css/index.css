@@ -624,6 +624,16 @@ body.manager-mode .redirect-view {
   color: var(--success);
 }
 
+.redirect-home-btn {
+  width: 100%;
+  margin-top: 10px;
+  text-decoration: none;
+}
+
+.redirect-home-btn:hover {
+  text-decoration: none;
+}
+
 .modal {
   position: fixed;
   inset: 0;
