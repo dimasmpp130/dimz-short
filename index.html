@@ -100,7 +100,7 @@
                   <i class="fa-solid fa-lock"></i>
                   <input id="password" type="password" placeholder="abcd12345" autocomplete="new-password" />
                 </div>
-                <div class="hint">Opsional. Kosongkan jika tidak diperlukan.</div>
+                <div class="hint">Opsional. Link tetap meminta CAPTCHA saat dibuka.</div>
               </div>
               <div class="actions">
                 <button class="btn btn-primary" type="submit" id="saveBtn">
@@ -189,7 +189,8 @@
             </div>
             <h2 id="redirectTitle">Shortlink siap dibuka</h2>
             <p id="redirectMessage"> Tunggu sebentar sebelum melanjutkan ke tujuan. </p>
-            <div id="countdownLabel" class="countdown-label"> 
+            <div id="countdownLabel" class="countdown-label"> Tunggu <strong>
+                <span id="countdown">10</span> detik </strong>
             </div>
             <div id="passwordPanel" class="password-panel hidden">
               <div class="field">
