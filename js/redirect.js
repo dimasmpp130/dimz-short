@@ -6,6 +6,8 @@ let currentAlias = "";
 let currentToken = "";
 let recaptchaToken = "";
 let protectedLink = false;
+let recaptchaWidgetId = null;
+let captchaRenderTimer = null;
 let countdownTimer = null;
 
 function setStatus(message, type = "") {
@@ -168,81 +170,84 @@ function updateContinueState() {
 
 
 function showCaptchaRetry() {
-  const status = $("#redirectStatus");
+  const status = $("redirectStatus");
   if (!status) return;
-
-  let retry = $("#captchaRetry");
-  if (retry) return;
-
-  retry = document.createElement("button");
-  retry.id = "captchaRetry";
-  retry.type = "button";
-  retry.textContent = "Muat Ulang CAPTCHA";
-  retry.style.cssText =
-    "display:block;margin:8px auto 0;border:0;background:transparent;color:#4f46e5;font-weight:700;cursor:pointer;padding:6px 10px";
-
-  status.insertAdjacentElement("afterend", retry);
-
-  retry.addEventListener("click", async () => {
-    retry.remove();
-    recaptchaToken = "";
-    await renderCaptcha();
-  });
+  let retry = $("captchaRetry");
+  if (!retry) {
+    retry = document.createElement("button");
+    retry.id = "captchaRetry";
+    retry.type = "button";
+    retry.textContent = "Muat Ulang CAPTCHA";
+    retry.className = "captcha-retry";
+    status.insertAdjacentElement("afterend", retry);
+    retry.addEventListener("click", async () => {
+      retry.disabled = true;
+      retry.textContent = "Memuat CAPTCHA...";
+      recaptchaToken = "";
+      captchaRenderTimer && clearTimeout(captchaRenderTimer);
+      recaptchaWidgetId = null;
+      await renderCaptcha(true);
+    });
+  }
+  retry.disabled = false;
 }
 
-async function renderCaptcha() {
-  const wrap = $("#recaptchaWrap");
-  const button = $("#continueBtn");
+function removeCaptchaRetry() { $("captchaRetry")?.remove(); }
+function captchaLooksRendered(wrap) {
+  return Boolean(wrap?.querySelector("iframe, textarea[name='g-recaptcha-response'], .g-recaptcha-response"));
+}
+
+async function renderCaptcha(force = false) {
+  const wrap = $("recaptchaWrap");
+  const button = $("continueBtn");
   if (!wrap || !button) return;
 
+  clearTimeout(captchaRenderTimer);
   wrap.classList.remove("hidden");
   button.classList.remove("hidden");
   button.disabled = true;
-  setStatus("Silakan selesaikan CAPTCHA untuk melanjutkan.");
+  setStatus("Memuat CAPTCHA...");
 
   try {
     const config = await getConfig();
-    if (!config.recaptchaSiteKey) {
-      throw new Error("CAPTCHA belum dikonfigurasi. Hubungi admin.");
-    }
+    if (!config.recaptchaSiteKey) throw new Error("CAPTCHA belum dikonfigurasi. Hubungi admin.");
 
     const recaptcha = await loadRecaptcha();
-    wrap.innerHTML = "";
+    if (!force && recaptchaWidgetId !== null && captchaLooksRendered(wrap)) return;
 
-    recaptcha.render(wrap, {
+    recaptchaToken = "";
+    removeCaptchaRetry();
+    wrap.innerHTML = "";
+    recaptchaWidgetId = recaptcha.render(wrap, {
       sitekey: config.recaptchaSiteKey,
       theme: "light",
       callback: token => {
         recaptchaToken = token;
         updateContinueState();
-        setStatus(
-          protectedLink
-            ? "CAPTCHA berhasil. Masukkan password jika diperlukan, lalu lanjutkan."
-            : "CAPTCHA berhasil. Link siap diarahkan.",
-          "success"
-        );
+        setStatus(protectedLink ? "CAPTCHA berhasil. Masukkan password jika diperlukan, lalu lanjutkan." : "CAPTCHA berhasil. Link siap diarahkan.", "success");
       },
       "expired-callback": () => {
         recaptchaToken = "";
         updateContinueState();
-        setStatus("CAPTCHA kedaluwarsa. Silakan ulangi.", "error");
+        setStatus("CAPTCHA kedaluwarsa. Silakan verifikasi lagi.", "error");
       },
       "error-callback": () => {
         recaptchaToken = "";
         updateContinueState();
-        setStatus(
-          "CAPTCHA gagal dimuat. Coba muat ulang CAPTCHA.",
-          "error"
-        );
+        setStatus("CAPTCHA gagal dimuat. Tekan Muat Ulang CAPTCHA jika kotaknya tidak muncul.", "error");
         showCaptchaRetry();
       }
     });
+
+    captchaRenderTimer = setTimeout(() => {
+      if (!captchaLooksRendered(wrap) && !recaptchaToken) {
+        setStatus("CAPTCHA belum muncul. Tekan Muat Ulang CAPTCHA untuk mencoba lagi.", "error");
+        showCaptchaRetry();
+      }
+    }, 5000);
   } catch (error) {
     updateContinueState();
-    setStatus(
-      error.message || "Gagal memuat CAPTCHA. Coba lagi.",
-      "error"
-    );
+    setStatus(error.message || "Gagal memuat CAPTCHA. Tekan Muat Ulang CAPTCHA untuk mencoba lagi.", "error");
     showCaptchaRetry();
   }
 }
