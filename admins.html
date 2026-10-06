@@ -233,7 +233,11 @@
         </div>
         <div id="adminQrGalleryWrap" class="field hidden">
           <label for="adminQrLogoFile">Pilih gambar dari galeri</label>
-          <input id="adminQrLogoFile" class="input" type="file" accept="image/*">
+          <div class="qr-file-picker">
+            <label for="adminQrLogoFile" class="btn btn-secondary">Pilih Gambar</label>
+            <input id="adminQrLogoFile" class="qr-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml">
+            <img id="adminQrPreview" class="qr-preview" alt="Pratinjau logo QR">
+          </div>
           <div id="adminQrFileName" class="qr-file-name">Belum ada gambar dipilih.</div>
         </div>
         <div id="adminQrCanvas" class="qr-admin"></div>
