@@ -42,6 +42,14 @@ function getFormElements() {
   };
 }
 
+function applySavedDefaults() {
+  const e = getFormElements();
+  const days = Number(localStorage.getItem("dimz_default_expiry") || 0);
+  if (!e.expiration) return;
+  if (days > 0 && [...e.expiration.options].some(o => o.value === String(days))) e.expiration.value = String(days);
+  else if ([...e.expiration.options].some(o => o.value === "never")) e.expiration.value = "never";
+}
+
 function resetForm() {
   const e = getFormElements();
   e.form.reset();
@@ -50,6 +58,7 @@ function resetForm() {
   e.saveButton.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> <span>Buat Link</span>`;
   e.cancelEdit.classList.add("hidden");
   e.customExpirationWrap.classList.add("hidden");
+  applySavedDefaults();
 }
 
 function openResultModal(shortUrl, destination = "") {
@@ -363,3 +372,5 @@ export async function initManager() {
     toast("Shortlink berhasil dibuat.");
   }
 }
+
+try { applySavedDefaults(); } catch {}
