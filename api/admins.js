@@ -5,7 +5,8 @@ const REDIS_TOKEN = process.env.DIMZLINK_KV_REST_API_TOKEN;
 const ADMIN_PASSWORD = process.env.DIMZLINK_ADMIN_PASSWORD || "";
 const ADMIN_PASSWORD_HASH = process.env.DIMZLINK_ADMIN_PASSWORD_HASH || "";
 const ADMIN_SECRET = process.env.DIMZLINK_ADMIN_SECRET || "";
-const SESSION_MAX_AGE = 8 * 60 * 60 * 1000;
+const SESSION_MAX_AGE = 6 * 60 * 60 * 1000;
+const LOGIN_RATE = { limit: 8, window: 15 * 60 };
 
 function setSecurityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -24,6 +25,18 @@ function json(res, status, data) {
 }
 
 function redisReady() { return Boolean(REDIS_URL && REDIS_TOKEN); }
+
+async function loginRateLimit(req) {
+  const ip = String(req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
+  const key = `dimz:admin-login:${sha256(ip)}`;
+  const count = Number(await redisCommand("INCR", key));
+  if (count === 1) await redisCommand("EXPIRE", key, LOGIN_RATE.window);
+  if (count > LOGIN_RATE.limit) {
+    const e = new Error("Terlalu banyak percobaan login. Silakan coba lagi beberapa menit.");
+    e.status = 429;
+    throw e;
+  }
+}
 
 function sha256(value) { return crypto.createHash("sha256").update(String(value)).digest("hex"); }
 
@@ -171,7 +184,7 @@ function publicAdminLink(link) {
   };
 }
 
-function buildStats(links) {
+function buildStats(links, from = null, to = null) {
   const stats = {
     totalLinks: links.length,
     totalClicks: 0,
@@ -185,8 +198,14 @@ function buildStats(links) {
   const bump = (obj, key) => { const k = key || "Tidak diketahui"; obj[k] = (obj[k] || 0) + 1; };
 
   for (const link of links) {
-    stats.totalClicks += Number(link.clicks || 0);
-    for (const e of Array.isArray(link.events) ? link.events : []) {
+    const events = Array.isArray(link.events) ? link.events : [];
+    if (!from && !to) stats.totalClicks += Number(link.clicks || 0);
+    for (const e of events) {
+      if (e.time) {
+        const ms = Date.parse(e.time);
+        if (!Number.isNaN(ms) && ((from && ms < from) || (to && ms > to))) continue;
+        if (from || to) stats.totalClicks++;
+      }
       if (e.visitor) stats.uniqueVisitors.add(e.visitor);
       e.type === "bot" ? stats.bot++ : stats.human++;
       bump(stats.countries, e.country);
@@ -208,13 +227,39 @@ function buildStats(links) {
   return stats;
 }
 
+function isPrivateHostname(hostname) {
+  const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const m = host.match(/^172\.(\d+)\./);
+  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true;
+  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return true;
+  return false;
+}
+
+function validateDestination(value) {
+  const text = String(value || "").trim();
+  if (text.length > 4096) throw Object.assign(new Error("URL tujuan terlalu panjang."), {status:400});
+  try {
+    const url = new URL(text);
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw Object.assign(new Error("URL tujuan harus menggunakan HTTP atau HTTPS."), {status:400});
+    if (url.username || url.password) throw Object.assign(new Error("URL dengan kredensial tertanam tidak diizinkan."), {status:400});
+    if (isPrivateHostname(url.hostname)) throw Object.assign(new Error("URL tujuan ke alamat lokal/private tidak diizinkan."), {status:400});
+    const blocked = ["dimz-short.vercel.app", "link.dimz-wtf.web.id"];
+    if (blocked.includes(url.hostname.toLowerCase())) throw Object.assign(new Error("URL tujuan tidak diizinkan."), {status:400});
+    return url.toString();
+  } catch (e) {
+    if (e?.status) throw e;
+    throw Object.assign(new Error("URL tujuan tidak valid."), {status:400});
+  }
+}
+
 async function updateLink(body) {
   const alias = String(body.alias || "").trim();
   const raw = await redisCommand("GET", `dimzlink:${alias}`);
   if (!raw) { const e = new Error("Shortlink tidak ditemukan."); e.status = 404; throw e; }
   const link = JSON.parse(raw);
-  const destination = String(body.destination || "").trim();
-  if (!validUrl(destination)) throw new Error("URL tujuan tidak valid.");
+  const destination = validateDestination(body.destination);
   link.destination = destination;
   if (Object.prototype.hasOwnProperty.call(body, "expiresAt")) {
     if (!body.expiresAt) link.expiresAt = null;
@@ -235,6 +280,20 @@ async function deleteLink(alias) {
   await redisCommand("DEL", `dimzlink:clicks:${alias}`);
   await redisCommand("DEL", `dimzlink:events:${alias}`);
   await redisCommand("SREM", "dimzlink:index", alias);
+}
+
+async function resetStats(alias) {
+  const safeAlias = String(alias || "").trim();
+  const raw = await redisCommand("GET", `dimzlink:${safeAlias}`);
+  if (!raw) { const e = new Error("Shortlink tidak ditemukan."); e.status = 404; throw e; }
+  const link = JSON.parse(raw);
+  link.clicks = 0;
+  link.lastClickAt = null;
+  link.clickLog = [];
+  await redisCommand("SET", `dimzlink:${safeAlias}`, JSON.stringify(link));
+  await redisCommand("DEL", `dimzlink:clicks:${safeAlias}`);
+  await redisCommand("DEL", `dimzlink:events:${safeAlias}`);
+  return link;
 }
 
 function csvEscape(value) {
@@ -275,7 +334,9 @@ export default async function handler(req, res) {
         return res.end(csv);
       }
       const links = await getAllLinks();
-      const stats = buildStats(links);
+      const from = query.from ? Date.parse(String(query.from)) : null;
+      const to = query.to ? Date.parse(String(query.to)) : null;
+      const stats = buildStats(links, Number.isNaN(from) ? null : from, Number.isNaN(to) ? null : to);
       return json(res, 200, {
         ok: true, authenticated: true,
         links: links.map(publicAdminLink).sort((a,b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0)),
@@ -288,6 +349,7 @@ export default async function handler(req, res) {
     const action = String(body.action || "");
 
     if (action === "login") {
+      await loginRateLimit(req);
       if (!verifyAdminPassword(String(body.password || ""))) return json(res, 401, { ok: false, error: "Password admin salah." });
       setSessionCookie(res, makeSessionToken());
       return json(res, 200, { ok: true, authenticated: true });
@@ -316,6 +378,10 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true });
     }
 
+    if (action === "resetStats") {
+      return json(res, 200, { ok: true, link: publicAdminLink(await resetStats(String(body.alias || ""))) });
+    }
+
     if (action === "export") {
       const csv = await exportCsv();
       setSecurityHeaders(res);
@@ -328,6 +394,8 @@ export default async function handler(req, res) {
     return json(res, 400, { ok: false, error: "Aksi tidak dikenali." });
   } catch (error) {
     console.error("DIMZ ADMIN API:", error);
-    return json(res, error.status || 500, { ok: false, error: error.message || "Terjadi kesalahan server." });
+    const status = Number(error?.status) || 500;
+    const message = status >= 500 ? "Terjadi kesalahan server. Silakan coba lagi." : (error?.message || "Permintaan tidak dapat diproses.");
+    return json(res, status, { ok: false, error: message });
   }
 }
