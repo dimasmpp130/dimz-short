@@ -726,3 +726,66 @@ tbody tr:hover {
   width: 250px;
   margin: 12px auto;
 }
+
+
+/* ===== Responsive hardening ===== */
+html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+.app, .container, .topbar, .topbar-inner, .heading, .settings-card,
+.stats, .analytics-grid, .toolbar, .table-card, .modal-backdrop, .modal { min-width: 0; }
+.top-actions { min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+.top-actions .btn { white-space: nowrap; }
+.settings-grid > *, .stats > *, .analytics-grid > *, .toolbar > * { min-width: 0; }
+.input, select, textarea, input { max-width: 100%; }
+.table-scroll { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.modal-backdrop { overflow: auto; }
+.modal { width: min(680px, calc(100vw - 24px)); margin: auto; }
+.modal-wide { width: min(900px, calc(100vw - 24px)); }
+.modal-head > * { min-width: 0; }
+.modal-actions { flex-wrap: wrap; }
+.modal-actions .btn { flex: 0 1 auto; }
+.qr-source-switch { width: 100%; }
+.qr-source-btn { min-width: 0; }
+.qr-file-picker { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.qr-file-picker .btn { flex: 0 0 auto; }
+.qr-file-input { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+.qr-preview { display: none; width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #fff; }
+.qr-preview.show { display: block; }
+
+@media (max-width: 760px) {
+  .topbar-inner { align-items: flex-start; padding: 10px 0; flex-direction: column; }
+  .top-actions { width: 100%; justify-content: stretch; }
+  .top-actions .btn { flex: 1 1 0; min-width: 0; }
+  .container { padding-top: 22px; }
+  .heading { margin-bottom: 18px; }
+  .modal-actions .btn { flex: 1 1 140px; }
+}
+
+@media (max-width: 520px) {
+  .top-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .top-actions .btn:last-child { grid-column: 1 / -1; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .stat { min-height: 92px; }
+  .stat-label { font-size: 10px; }
+  .stat-value { font-size: 20px; }
+  .toolbar { gap: 8px; }
+  .modal-backdrop { padding: 10px; align-items: flex-start; }
+  .modal, .modal-wide { width: 100%; max-height: calc(100dvh - 20px); margin: 0; border-radius: 17px; padding: 15px; }
+  .modal-head { gap: 9px; margin-bottom: 15px; }
+  .close { flex: 0 0 34px; }
+  .qr-admin { min-height: 190px; overflow: hidden; }
+  .qr-admin.qr-overlay { max-width: 100%; width: min(250px, 100%); }
+  .qr-admin canvas, .qr-admin img:not(.qr-logo) { max-width: 100%; height: auto; }
+  .qr-file-picker { align-items: stretch; }
+  .qr-file-picker .btn { width: 100%; }
+  .qr-preview { margin: 0 auto; }
+  .actions { max-width: 100%; }
+  .small-btn { min-height: 34px; }
+}
+
+@media (max-width: 380px) {
+  .topbar-inner, .container { width: calc(100% - 16px); }
+  .brand-title { font-size: 14px; }
+  .stats { gap: 7px; }
+  .stat { padding: 12px; }
+  .stat-value { font-size: 18px; }
+}
