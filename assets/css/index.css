@@ -698,41 +698,23 @@ body.manager-mode .redirect-view {
   box-sizing: border-box;
 }
 
-#qrCanvas img,
-#qrCanvas canvas {
+#qrCanvas .qr-render {
   display: block;
   width: min(240px, 72vw) !important;
   height: min(240px, 72vw) !important;
   max-width: 100%;
   max-height: 100%;
   margin: 0 auto !important;
+  background: #fff;
+  image-rendering: auto;
 }
 
 #qrCanvas .hint {
   text-align: center;
 }
 
-#qrCanvas.qr-overlay {
-  display: grid !important;
-  width: 100% !important;
-  position: relative !important;
-  place-items: center !important;
-  justify-items: center !important;
-  align-items: center !important;
-  align-content: center !important;
-}
-
-#qrCanvas.qr-overlay .qr-logo {
-  position: absolute;
-  width: min(48px, 14vw);
-  height: min(48px, 14vw);
-  max-width: none;
-  max-height: none;
-  margin: 0 !important;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
+/* The logo is baked into .qr-render on a canvas.
+   Do not style QR logos as separate <img> overlays. */
 
 .share-grid {
   display: grid;
