@@ -58,7 +58,7 @@
           <section class="card form-card">
             <div class="section-title">
               <div>
-                <h3 id="formTitle">Buat Shortlink</h3>
+                <h3 id="formTitle"></h3>
                 <span>Tempel URL → buat link → salin.</span>
               </div>
             </div>
@@ -67,7 +67,7 @@
                 <label for="destination">URL Tujuan</label>
                 <div class="input-wrap">
                   <i class="fa-solid fa-link"></i>
-                  <input id="destination" type="url" placeholder="https://contoh.com/halaman" autocomplete="url" required />
+                  <input id="destination" type="url" placeholder="https://contoh.com/" autocomplete="url" required />
                 </div>
               </div>
               <div class="grid">
@@ -100,14 +100,14 @@
                   <i class="fa-solid fa-lock"></i>
                   <input id="password" type="password" placeholder="abcd12345" autocomplete="new-password" />
                 </div>
-                <div class="hint">Opsional. Link tetap meminta CAPTCHA saat dibuka.</div>
+                <div class="hint">Kosongkan jika tidak diperlukan.</div>
               </div>
               <div class="actions">
                 <button class="btn btn-primary" type="submit" id="saveBtn">
                   <i class="fa-solid fa-wand-magic-sparkles"></i>
                   <span>Buat Link</span>
                 </button>
-                <button class="btn btn-secondary hidden" type="button" id="cancelEdit"> Batal Edit </button>
+                <button class="btn btn-secondary hidden" type="button" id="cancelEdit"></button>
               </div>
             </form>
           </section>
@@ -157,7 +157,7 @@
         </div>
       </div>
       <footer class="footer manager-footer">
-        <div class="container">DIMZ/SHORT · URL Shortener gratis</div>
+        <div class="container">DIMZLINK · Free URL Shortener</div>
       </footer>
     </div>
     <div class="redirect-view">
@@ -187,10 +187,10 @@
                 <span>Simple URL Shortener</span>
               </div>
             </div>
-            <h2 id="redirectTitle">Shortlink siap dibuka</h2>
-            <p id="redirectMessage"> Tunggu sebentar sebelum melanjutkan ke tujuan. </p>
-            <div id="countdownLabel" class="countdown-label"> Tunggu <strong>
-                <span id="countdown">10</span> detik </strong>
+            <h2 id="redirectTitle"></h2>
+            <p id="redirectMessage"></p>
+            <div id="countdownLabel" class="countdown-label"><strong>
+                <span id="countdown"></span> detik </strong>
             </div>
             <div id="passwordPanel" class="password-panel hidden">
               <div class="field">
@@ -233,7 +233,7 @@
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-        <div id="resultAnalysis" class="result-analysis">Pemeriksaan URL selesai.</div>
+        <div id="resultAnalysis" class="result-analysis"></div>
         <div class="result-url">
           <input id="resultShortUrl" type="text" readonly />
           <button id="copyResult" class="btn btn-primary" type="button">
@@ -241,7 +241,7 @@
           </button>
         </div>
         <div id="qrCanvas" class="qr-box">
-          <span class="hint">QR akan dibuat dengan logo DIMZ di tengah.</span>
+          <span class="hint">QR akan dibuat dengan logo di tengah.</span>
         </div>
         <div class="actions">
           <button id="generateQr" class="btn btn-secondary" type="button">
@@ -271,7 +271,7 @@
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-        <div id="analyticsSummary" class="result-analysis">Memuat analytics...</div>
+        <div id="analyticsSummary" class="result-analysis"></div>
         <div id="analyticsDetails" class="analytics-list"></div>
       </div>
     </div>
