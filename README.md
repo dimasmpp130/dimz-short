@@ -138,17 +138,3 @@ dimz-short-main/
 Health check dari browser sengaja digunakan agar server tidak menjadi proxy untuk URL arbitrary.
 
 Dukungan bahasa mengikuti bahasa browser: Bahasa Indonesia untuk browser Indonesia, dan English untuk browser lainnya.
-
-
-## Universal language translation
-
-DIMZLINK now supports automatic browser-language detection plus dynamic translation for languages without a bundled translation pack. Dynamic translation is performed server-side through `api/translate.js`, so the provider API key is never exposed to visitors.
-
-### Vercel setup
-
-1. Create/enable a Google Cloud Translation API credential.
-2. In Vercel, open **Project → Settings → Environment Variables**.
-3. Add `GOOGLE_TRANSLATE_API_KEY` with the Translation API key.
-4. Redeploy the project.
-
-The app still works without the variable: bundled translations remain available and unsupported dynamic translations safely fall back to the original text.
