@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" data-i18n="auto">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -28,7 +28,7 @@
             <div class="brand-icon">D</div>
             <div>
               <h1>DIMZLINK</h1>
-              <p>Simple URL shortener</p>
+              <p data-i18n="brand_sub">Simple URL shortener</p>
             </div>
           </div>
         </div>
@@ -52,87 +52,87 @@
       <main class="main">
         <div class="container">
           <section class="hero">
-            <h2>Shorten your link.</h2>
-            <p> Buat shortlink sederhana dengan keamanan otomatis, QR berlogo, dan analytics. </p>
+            <h2 data-i18n="hero_title">Shorten your link.</h2>
+            <p data-i18n="hero_desc">Create a simple shortlink with automatic security, branded QR, and analytics.</p>
           </section>
           <section class="card form-card">
             <div class="section-title">
               <div>
-                <h3 id="formTitle"></h3>
-                <span>Tempel URL → buat link → salin.</span>
+                <h3 id="formTitle" data-i18n="form_title_create">Create Shortlink</h3>
+                <span data-i18n="form_hint">Paste URL → create link → copy.</span>
               </div>
             </div>
             <form id="shortlinkForm">
               <div class="field">
-                <label for="destination">URL Tujuan</label>
+                <label for="destination" data-i18n="label_destination">Destination URL</label>
                 <div class="input-wrap">
                   <i class="fa-solid fa-link"></i>
-                  <input id="destination" type="url" placeholder="https://contoh.com/" autocomplete="url" required />
+                  <input id="destination" type="url" data-i18n-placeholder="placeholder_destination" placeholder="https://example.com/" autocomplete="url" required />
                 </div>
               </div>
               <div class="grid">
                 <div class="field">
-                  <label for="alias">Alias Custom</label>
+                  <label for="alias" data-i18n="label_alias">Custom Alias</label>
                   <div class="input-wrap">
                     <i class="fa-solid fa-hashtag"></i>
-                    <input id="alias" type="text" maxlength="32" pattern="[A-Za-z0-9_-]{4,32}" placeholder="contoh123" autocomplete="off" />
+                    <input id="alias" type="text" maxlength="32" pattern="[A-Za-z0-9_-]{4,32}" data-i18n-placeholder="placeholder_alias" placeholder="example123" autocomplete="off" />
                   </div>
-                  <div class="hint"> Kosongkan untuk dibuat otomatis. Maksimal 4–32 karakter. </div>
+                  <div class="hint" data-i18n="hint_alias">Leave empty for automatic generation. Max 4–32 characters.</div>
                 </div>
                 <div class="field">
-                  <label for="expiration">Kedaluwarsa</label>
+                  <label for="expiration" data-i18n="label_expiration">Expiration</label>
                   <select id="expiration">
-                    <option value="never">Tidak kedaluwarsa</option>
-                    <option value="1d">1 hari</option>
-                    <option value="7d">7 hari</option>
-                    <option value="30d">30 hari</option>
-                    <option value="custom">Tanggal khusus</option>
+                    <option value="never" data-i18n="opt_never">Never expires</option>
+                    <option value="1d" data-i18n="opt_1d">1 day</option>
+                    <option value="7d" data-i18n="opt_7d">7 days</option>
+                    <option value="30d" data-i18n="opt_30d">30 days</option>
+                    <option value="custom" data-i18n="opt_custom">Custom date</option>
                   </select>
                 </div>
               </div>
               <div class="field hidden" id="customExpirationWrap">
-                <label for="customExpiration">Tanggal kedaluwarsa</label>
+                <label for="customExpiration" data-i18n="label_custom_expiration">Expiration date</label>
                 <input id="customExpiration" type="datetime-local" />
               </div>
               <div class="field">
-                <label for="password">Password</label>
+                <label for="password" data-i18n="label_password">Password</label>
                 <div class="input-wrap">
                   <i class="fa-solid fa-lock"></i>
-                  <input id="password" type="password" placeholder="abcd12345" autocomplete="new-password" />
+                  <input id="password" type="password" data-i18n-placeholder="placeholder_password" placeholder="abcd12345" autocomplete="new-password" />
                 </div>
-                <div class="hint">Kosongkan jika tidak diperlukan.</div>
+                <div class="hint" data-i18n="hint_password">Leave empty if not needed.</div>
               </div>
               <div class="actions">
                 <button class="btn btn-primary" type="submit" id="saveBtn">
                   <i class="fa-solid fa-wand-magic-sparkles"></i>
-                  <span>Buat Link</span>
+                  <span data-i18n="btn_create">Create Link</span>
                 </button>
-                <button class="btn btn-secondary hidden" type="button" id="cancelEdit"> Batal Edit </button>
+                <button class="btn btn-secondary hidden" type="button" id="cancelEdit" data-i18n="btn_cancel_edit">Cancel Edit</button>
               </div>
             </form>
           </section>
           <section class="card manager-card">
             <div class="manager-head">
               <div>
-                <h3>Link Saya</h3>
-                <div class="hint">Kelola link: salin, QR, analytics, pause, edit, atau hapus.</div>
+                <h3 data-i18n="my_links">My Links</h3>
+                <div class="hint" data-i18n="my_links_hint">Manage links: copy, QR, analytics, pause, edit, or delete.</div>
               </div>
               <div class="link-toolbar">
                 <div class="search">
-                  <input id="searchLinks" type="search" placeholder="Cari alias atau URL..." autocomplete="off" />
+                  <input id="searchLinks" type="search" data-i18n-placeholder="search_placeholder" placeholder="Search alias or URL..." autocomplete="off" />
                 </div>
-                <select id="linkStatusFilter" aria-label="Filter status">
-                  <option value="all">Semua status</option>
-                  <option value="active">Aktif</option>
-                  <option value="paused">Dijeda</option>
-                  <option value="expired">Kedaluwarsa</option>
-                  <option value="protected">Berpassword</option>
+                <select id="linkStatusFilter" data-i18n-aria="filter_all" aria-label="Filter status">
+                  <option value="all" data-i18n="filter_all">All statuses</option>
+                  <option value="active" data-i18n="status_active">Active</option>
+                  <option value="paused" data-i18n="status_paused">Paused</option>
+                  <option value="expired" data-i18n="status_expired">Expired</option>
+                  <option value="protected" data-i18n="status_protected">Password protected</option>
                 </select>
-                <select id="linkSort" aria-label="Urutan link">
-                  <option value="newest">Terbaru</option>
-                  <option value="oldest">Terlama</option>
-                  <option value="clicks">Klik terbanyak</option>
-                  <option value="alias">Alias A–Z</option>
+                <select id="linkSort" aria-label="Sort">
+                  <option value="newest" data-i18n="sort_newest">Newest</option>
+                  <option value="oldest" data-i18n="sort_oldest">Oldest</option>
+                  <option value="clicks" data-i18n="sort_clicks">Most clicks</option>
+                  <option value="alias" data-i18n="sort_alias">Alias A–Z</option>
                 </select>
               </div>
             </div>
@@ -156,8 +156,9 @@
           </div>
         </div>
       </div>
+      <!-- Language switcher is injected by i18n.js above the footer -->
       <footer class="footer manager-footer">
-        <div class="container">DIMZLINK · Free URL Shortener</div>
+        <div class="container" data-i18n="footer">DIMZLINK · Free URL Shortener</div>
       </footer>
     </div>
     <div class="redirect-view">
@@ -184,25 +185,26 @@
               <div class="redirect-brand-icon">D</div>
               <div>
                 <strong>DIMZLINK</strong>
-                <span>Simple URL Shortener</span>
+                <span data-i18n="brand_sub">Simple URL Shortener</span>
               </div>
             </div>
             <h2 id="redirectTitle"></h2>
             <p id="redirectMessage"></p>
-            <div id="countdownLabel" class="countdown-label">Tunggu <strong>
-                <span id="countdown"></span> Detik</strong>
+            <div id="countdownLabel" class="countdown-label">
+              <span data-i18n="countdown_wait">Wait</span> <strong><span id="countdown"></span> <span data-i18n="countdown_seconds">seconds</span></strong>
             </div>
             <div id="passwordPanel" class="password-panel hidden">
               <div class="field">
-                <label for="redirectPassword"> Password </label>
-                <input id="redirectPassword" type="password" placeholder="Masukkan password" autocomplete="off" />
+                <label for="redirectPassword" data-i18n="redirect_password_label">Password</label>
+                <input id="redirectPassword" type="password" data-i18n-placeholder="redirect_password_placeholder" placeholder="Enter password" autocomplete="off" />
               </div>
             </div>
             <div id="recaptchaWrap" class="recaptcha-wrap hidden"></div>
             <button id="continueBtn" type="button" class="btn btn-primary hidden" style="width:100%;" disabled>
-              <i class="fa-solid fa-arrow-right"></i> Continue </button>
+              <i class="fa-solid fa-arrow-right"></i> <span data-i18n="btn_continue">Continue</span>
+            </button>
             <a id="homeBtn" class="btn btn-secondary hidden redirect-home-btn" href="/">
-              <i class="fa-solid fa-house"></i> Kembali ke Beranda
+              <i class="fa-solid fa-house"></i> <span data-i18n="btn_home">Back to Home</span>
             </a>
             <div id="redirectStatus" class="status"></div>
           </section>
@@ -228,7 +230,7 @@
     <div id="resultModal" class="modal">
       <div class="modal-card">
         <div class="modal-head">
-          <h3>Link berhasil dibuat</h3>
+          <h3 data-i18n="result_title">Link created successfully</h3>
           <button id="closeResult" class="close" type="button">
             <i class="fa-solid fa-xmark"></i>
           </button>
@@ -241,32 +243,39 @@
           </button>
         </div>
         <div id="qrCanvas" class="qr-box">
-          <span class="hint">QR akan dibuat dengan logo di tengah.</span>
+          <span class="hint" data-i18n="qr_hint">QR will be generated with logo in the center.</span>
         </div>
         <div class="actions">
           <button id="generateQr" class="btn btn-secondary" type="button">
-            <i class="fa-solid fa-qrcode"></i> Buat QR </button>
+            <i class="fa-solid fa-qrcode"></i> <span data-i18n="btn_generate_qr">Generate QR</span>
+          </button>
           <button id="downloadQrPng" class="btn btn-secondary" type="button">
-            <i class="fa-solid fa-download"></i> PNG </button>
+            <i class="fa-solid fa-download"></i> <span data-i18n="btn_png">PNG</span>
+          </button>
           <button id="downloadQrSvg" class="btn btn-secondary" type="button">
-            <i class="fa-solid fa-download"></i> SVG </button>
+            <i class="fa-solid fa-download"></i> <span data-i18n="btn_svg">SVG</span>
+          </button>
         </div>
         <div class="share-grid">
           <button id="shareNative" class="share-btn">
-            <i class="fa-solid fa-share-nodes"></i> Share </button>
+            <i class="fa-solid fa-share-nodes"></i> <span data-i18n="btn_share">Share</span>
+          </button>
           <button id="shareWhatsapp" class="share-btn">
-            <i class="fa-brands fa-whatsapp"></i> WhatsApp </button>
+            <i class="fa-brands fa-whatsapp"></i> WhatsApp
+          </button>
           <button id="shareTelegram" class="share-btn">
-            <i class="fa-brands fa-telegram"></i> Telegram </button>
+            <i class="fa-brands fa-telegram"></i> Telegram
+          </button>
           <button id="shareFacebook" class="share-btn">
-            <i class="fa-brands fa-facebook"></i> Facebook </button>
+            <i class="fa-brands fa-facebook"></i> Facebook
+          </button>
         </div>
       </div>
     </div>
     <div id="analyticsModal" class="modal">
       <div class="modal-card">
         <div class="modal-head">
-          <h3>Analytics Link</h3>
+          <h3 data-i18n="analytics_title">Link Analytics</h3>
           <button id="closeAnalytics" class="close" type="button">
             <i class="fa-solid fa-xmark"></i>
           </button>
