@@ -543,7 +543,7 @@ body.manager-mode .redirect-view {
   margin: 18px 0;
 }
 
-.recaptcha-wrap {
+.turnstile-wrap {
   display: flex;
   justify-content: center;
   min-height: 65px;
