@@ -95,8 +95,8 @@ DIMZLINK_KV_REST_API_TOKEN=
 DIMZLINK_TOKEN_SECRET=
 DIMZLINK_IP_SECRET=
 
-DIMZLINK_RECAPTCHA_SITE_KEY=
-DIMZLINK_RECAPTCHA_SECRET_KEY=
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
 
 DIMZLINK_ADMIN_PASSWORD=
 DIMZLINK_ADMIN_PASSWORD_HASH=
@@ -137,4 +137,15 @@ dimz-short-main/
 
 Health check dari browser sengaja digunakan agar server tidak menjadi proxy untuk URL arbitrary.
 
-Dukungan bahasa mengikuti bahasa browser: Bahasa Indonesia untuk browser Indonesia, dan English untuk browser lainnya.
+Language support: English base with full translations for Indonesian, Spanish, French, German, Portuguese, Chinese, Japanese and more. Auto-detects browser language. Language switcher is available centered above the footer.
+
+
+## Cloudflare Turnstile
+
+1. Buat widget di https://dash.cloudflare.com/ pada menu Turnstile.
+2. Tambahkan domain produksi dan domain preview yang benar-benar digunakan.
+3. Di Vercel Project Settings → Environment Variables, tambahkan:
+   - `TURNSTILE_SITE_KEY` — Site Key publik untuk widget frontend.
+   - `TURNSTILE_SECRET_KEY` — Secret Key untuk verifikasi server; jangan pernah taruh di HTML/JS.
+4. Redeploy setelah mengubah environment variables.
+5. Pastikan domain widget di Cloudflare cocok dengan domain website. Untuk pengujian lokal, tambahkan `localhost` pada daftar hostname atau gunakan test keys resmi Cloudflare.
