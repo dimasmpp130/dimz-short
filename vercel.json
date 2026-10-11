@@ -29,6 +29,13 @@
       "destination": "/index.html?alias=$1"
     }
   ],
+  "routes": [    
+    {
+      "src": "/.*",
+      "dest": "/error.html",
+      "status": 404
+    }
+  ],
   "headers": [
     {
       "source": "/(.*\\.html)",
