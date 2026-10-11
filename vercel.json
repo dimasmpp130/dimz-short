@@ -29,7 +29,11 @@
       "destination": "/index.html?alias=$1"
     }
   ],
-  "routes": [    
+  "routes": [
+    {
+      "src": "/sitemap\\.xml$",
+      "dest": "/sitemap.xml"
+    },
     {
       "src": "/.*",
       "dest": "/error.html",
