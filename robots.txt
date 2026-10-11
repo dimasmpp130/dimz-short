@@ -1,7 +1,7 @@
 User-agent: *
-Allow: /$
 Allow: /sitemap.xml
 Allow: /robots.txt
+Allow: /$
 Disallow: /
 
 Sitemap: https://link.dimz-wtf.web.id/sitemap.xml
