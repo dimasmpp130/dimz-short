@@ -13,6 +13,10 @@
   ],
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/admins",
       "destination": "/admins.html"
     },
@@ -27,17 +31,10 @@
     {
       "source": "/:alias([A-Za-z0-9_-]{4,32})",
       "destination": "/index.html?alias=$1"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/sitemap\\.xml$",
-      "dest": "/sitemap.xml"
     },
     {
-      "src": "/.*",
-      "dest": "/error.html",
-      "status": 404
+      "source": "/:path*",
+      "destination": "/error.html"
     }
   ],
   "headers": [
