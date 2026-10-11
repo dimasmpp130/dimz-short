@@ -33,6 +33,14 @@
       "destination": "/index.html?alias=$1"
     },
     {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
       "source": "/:path*",
       "destination": "/error.html"
     }
